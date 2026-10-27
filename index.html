@@ -1,0 +1,2173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rune Dice</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  :root { --bone:#e9dcbd; --panel:rgba(18,13,9,.86); --gold:#c9963a; --iron:#5c574f; --red:#c0452e; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#0d0a08; font-family:'Cinzel', Georgia, serif; font-weight:600; color:var(--bone); }
+  canvas { display:block; }
+  .plate { background:var(--panel); border:2px solid var(--iron); border-radius:10px;
+           box-shadow: inset 0 0 0 1px rgba(201,150,58,.35), 0 6px 20px rgba(0,0,0,.6); }
+  .hidden { display:none !important; }
+  button { font:inherit; color:var(--bone); background:#3b2a1c; border:1px solid var(--iron); border-radius:6px; padding:7px 14px; cursor:pointer; }
+  button:hover:not(:disabled) { background:#4d3624; }
+  button:disabled { opacity:.4; cursor:default; }
+  button.primary { background:var(--gold); color:#1b120a; font-weight:800; }
+  button.primary:hover:not(:disabled) { background:#dcab52; }
+  input, select { font:inherit; background:#20160f; color:var(--bone); border:1px solid var(--iron); border-radius:6px; padding:7px 10px; }
+  .ico { width:20px; height:20px; border-radius:4px; vertical-align:-5px; }
+  .goldtxt { color:var(--gold); }
+
+  /* --- In-game HUD --- */
+  #topbar { position:fixed; top:8px; left:50%; transform:translateX(-50%); padding:6px 16px; text-align:center; max-width:calc(100vw - 110px); box-sizing:border-box; }
+  #topbar .who { color:var(--gold); }
+  #chips { display:flex; gap:5px; justify-content:center; flex-wrap:wrap; margin-top:5px; }
+  #chips:empty { display:none; }
+  #chips img { width:28px; height:28px; border-radius:6px; border:1px solid var(--iron); }
+  #outcome { font-size:13px; margin-top:4px; }
+  #outcome:empty { display:none; }
+  #lastLog { font-size:11px; opacity:.6; margin-top:3px; }
+  .prow { display:flex; justify-content:space-between; gap:12px; padding:3px 4px; border-radius:4px; align-items:center; }
+  .prow .tag { opacity:.75; font-size:12px; }
+  /* Name / count labels that follow the 3D spots around the table */
+  #labels { position:fixed; inset:0; pointer-events:none; z-index:1; }
+  .spotLabel { position:fixed; transform:translate(-50%, 0); text-align:center; font-size:12px; line-height:1.25; white-space:nowrap;
+               text-shadow:0 1px 4px #000, 0 0 10px #000, 0 0 10px #000; }
+  .spotLabel b { color:var(--gold); font-size:16px; }
+  .spotLabel small { opacity:.7; font-size:10px; }
+  .spotLabel.cur { color:var(--gold); }
+  .spotLabel .ico { width:15px; height:15px; vertical-align:-3px; }
+  #bottom { position:fixed; left:50%; bottom:14px; transform:translateX(-50%); padding:10px 14px; text-align:center; max-width:calc(100vw - 32px); box-sizing:border-box; }
+  #status { font-size:14px; margin-bottom:8px; display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+  #actions { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  #waiting { font-size:13px; opacity:.7; }
+  #helpBtn { position:fixed; top:12px; right:12px; width:36px; height:36px; padding:0; border-radius:50%; z-index:11; }
+  #volBtn { position:fixed; top:12px; right:56px; width:36px; height:36px; padding:0; border-radius:50%; z-index:11; font-size:16px; }
+  #volPop { position:fixed; top:56px; right:12px; padding:10px 12px; z-index:12; display:flex; gap:8px; align-items:center; }
+  #volRange { width:120px; accent-color:var(--gold); padding:0; }
+  #tip { position:fixed; z-index:9; pointer-events:none; background:var(--panel); border:1px solid var(--iron); border-radius:6px; padding:5px 9px; font-size:12px; max-width:240px; }
+  #emotes { position:fixed; right:12px; top:56px; display:flex; flex-direction:column; gap:6px; z-index:5; }
+  #emotes button { width:40px; height:40px; padding:0; font-size:20px; border-radius:50%; }
+  .bubble { position:fixed; z-index:8; pointer-events:none; transform:translate(-50%, -100%); background:var(--panel); border:2px solid var(--gold);
+            border-radius:14px; padding:6px 12px; font-size:16px; white-space:nowrap; text-align:center; animation:bubble 2.6s ease-out forwards; }
+  .bubble .em { font-size:22px; vertical-align:-3px; }
+  .bubble small { display:block; font-size:10px; opacity:.7; }
+  @keyframes bubble { 0%{opacity:0; margin-top:12px} 10%{opacity:1; margin-top:0} 80%{opacity:1} 100%{opacity:0; margin-top:-30px} }
+  .hint { flex-basis:100%; font-size:11px; opacity:.6; margin-top:2px; }
+
+  /* --- Floating text & banners --- */
+  .float { position:fixed; pointer-events:none; font-weight:800; font-size:20px; text-shadow:0 2px 6px #000, 0 0 12px rgba(0,0,0,.8);
+           transform:translate(-50%,-50%); animation:floatUp 1.5s ease-out forwards; white-space:nowrap; }
+  @keyframes floatUp { 0%{opacity:0; margin-top:10px} 15%{opacity:1} 100%{opacity:0; margin-top:-60px} }
+  #banner { position:fixed; top:42%; left:50%; transform:translate(-50%,-50%); font-size:42px; font-weight:800; text-align:center; pointer-events:none;
+            text-shadow:0 3px 14px #000, 0 0 30px rgba(0,0,0,.9); opacity:0; white-space:nowrap; }
+  #banner small { display:block; font-size:16px; color:var(--bone); margin-top:6px; }
+  #banner.show { animation:banner 2.4s ease-out forwards; }
+  @keyframes banner { 0%{opacity:0; transform:translate(-50%,-40%) scale(.9)} 12%{opacity:1; transform:translate(-50%,-50%) scale(1)} 75%{opacity:1} 100%{opacity:0} }
+
+  /* --- Lobby / modals --- */
+  .modal { position:fixed; inset:0; display:grid; place-items:center; background:rgba(5,3,2,.6); padding:16px; box-sizing:border-box; z-index:10; }
+  .modal .plate { padding:22px 24px; width:min(440px, 100%); box-sizing:border-box; max-height:calc(100vh - 32px); overflow:auto; }
+  .modal h1 { margin:0 0 4px; font-size:34px; color:var(--gold); text-align:center; letter-spacing:2px; }
+  .modal h2 { margin:0 0 12px; font-size:20px; color:var(--gold); }
+  .modal .sub { text-align:center; opacity:.7; margin-bottom:18px; font-size:13px; }
+  .row { display:flex; gap:8px; margin:10px 0; align-items:center; }
+  .row > input { flex:1; min-width:0; }
+  .code { font-size:34px; letter-spacing:8px; text-align:center; color:var(--gold); margin:4px 0 2px; }
+  #lobbyPlayers .prow { background:rgba(255,255,255,.04); margin:4px 0; padding:6px 8px; }
+  .swatches { display:flex; gap:4px; align-items:center; }
+  .sw { width:26px; height:26px; border-radius:5px; border:2px solid transparent; opacity:.55; }
+  .sw.pick { cursor:pointer; }
+  .sw.sel { border-color:var(--gold); opacity:1; }
+  select.hs { padding:3px 4px; font-size:11px; margin-left:4px; }
+  .modal .plate { width:min(560px, 100%); }
+  .err { color:var(--red); font-size:13px; min-height:18px; }
+  .rules p, .rules li { font-size:14px; line-height:1.5; }
+  .rules ul { padding-left:0; list-style:none; }
+  .rules li { margin:6px 0; }
+  @media (max-width:640px) {
+    #banner { font-size:30px; }
+    #topbar { font-size:13px; }
+    .spotLabel { font-size:10px; }
+    .spotLabel b { font-size:13px; }
+  }
+</style>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+} }
+</script>
+</head>
+<body>
+<!-- In-game HUD -->
+<div id="labels" class="hidden"></div>
+<div id="topbar" class="plate hidden"><div id="turnLine"></div><div id="chips"></div><div id="outcome"></div><div id="lastLog"></div></div>
+<div id="bottom" class="plate hidden"><div id="status"></div><div id="actions"></div></div>
+<div id="banner"></div>
+<div id="tip" class="hidden"></div>
+<div id="emotes" class="hidden"></div>
+<button id="helpBtn" title="Rules">?</button>
+<button id="volBtn" title="Volume">🔊</button>
+<div id="volPop" class="plate hidden">
+  <input type="range" id="volRange" min="0" max="100" aria-label="Volume">
+  <button id="muteBtn">Mute</button>
+</div>
+
+<!-- Start screen -->
+<div id="startScreen" class="modal">
+  <div class="plate">
+    <h1>Rune Dice</h1>
+    <div class="sub">Sail, raid, bring the gold home.</div>
+    <div class="row"><input id="nameIn" placeholder="Your name" maxlength="16"></div>
+    <div class="row"><button class="primary" id="hostBtn" style="flex:1">Host online game</button></div>
+    <div class="row"><input id="codeIn" placeholder="Join code" maxlength="4" style="text-transform:uppercase"><button id="joinBtn">Join</button></div>
+    <div class="row"><button id="localBtn" style="flex:1">Play locally (one screen)</button></div>
+    <div class="err" id="startErr"></div>
+  </div>
+</div>
+
+<!-- Lobby -->
+<div id="lobby" class="modal hidden">
+  <div class="plate">
+    <h2>Mead hall</h2>
+    <div id="codeBox"><div style="text-align:center;font-size:13px;opacity:.7">Join code</div><div class="code" id="codeTxt"></div></div>
+    <div id="lobbyPlayers"></div>
+    <div id="hostControls">
+      <div class="row"><input id="localName" placeholder="Add a player on this screen" maxlength="16"><button id="addLocalBtn">Add</button></div>
+      <div class="row">Rounds <select id="roundsSel"><option>3</option><option selected>5</option><option>7</option><option>10</option></select>
+        <button class="primary" id="startBtn" style="flex:1">Start game</button></div>
+    </div>
+    <div id="lobbyWait" class="sub hidden">Waiting for the host to start…</div>
+    <div class="err" id="lobbyErr"></div>
+  </div>
+</div>
+
+<!-- Rules -->
+<div id="rules" class="modal hidden">
+  <div class="plate rules">
+    <h2>How to play</h2>
+    <p>On your <b>turn</b> you throw your dice again and again until you bust. Everyone takes one turn per <b>round</b>; most banked gold after the last round wins.</p>
+    <ul id="rulesList"></ul>
+    <div class="row"><button class="primary" id="rulesClose" style="flex:1">Got it</button></div>
+  </div>
+</div>
+
+<!-- Game over -->
+<div id="gameOver" class="modal hidden">
+  <div class="plate">
+    <h2 id="winnerTxt"></h2>
+    <div id="finalRows"></div>
+    <div class="row"><button class="primary" id="againBtn" style="flex:1">Play again</button></div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+// "Fat" lines: regular WebGL lines are always 1px wide, these can be any pixel width (used for lightning)
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+
+// =====================================================================
+//  RULES CONSTANTS — tweak these to rebalance
+// =====================================================================
+const START_DICE = 8;
+const SHIELDS_PER_STORM = 2;          // shields needed to stop one storm die being lost
+const MIN_DICE = 2;                   // below this your turn ends: a lone die can never bring gold home
+// Horn dice sit out your NEXT throw only, then rejoin (see `resting` below)
+
+// Palette the symbol drawings use. `let`, because faceCanvas() swaps these for each dice style while it draws.
+let BONE = '#e6d6b2', BONE_DK = '#c4ad82', INK = '#2a1b12', RED = '#8e2a1e', GOLD = '#c9963a', AMBER = '#a8692e';
+// Dice styles players can pick in the lobby. grain = rgb of the wood/bone streaks, carve = the offset "carved" highlight/shadow.
+const DICE_STYLES = {
+  bone:  { name: 'Bone',          bg: '#e6d6b2', bgDk: '#c4ad82', ink: '#2a1b12', red: '#8e2a1e', gold: '#c9963a', amber: '#a8692e', grain: '120,90,50',   edge: 'rgba(90,60,30,.35)',  carve: 'rgba(255,245,220,.55)' },
+  iron:  { name: 'Black iron',    bg: '#34343a', bgDk: '#55555e', ink: '#e4e2dc', red: '#b8463a', gold: '#d8ad52', amber: '#8f7350', grain: '255,255,255', edge: 'rgba(0,0,0,.55)',     carve: 'rgba(0,0,0,.7)' },
+  blood: { name: 'Blood-stained', bg: '#7c201a', bgDk: '#5a1611', ink: '#f2e2c4', red: '#2c0c09', gold: '#e6b85a', amber: '#c4874c', grain: '0,0,0',       edge: 'rgba(0,0,0,.45)',     carve: 'rgba(0,0,0,.6)' },
+  gold:  { name: 'Gold-trimmed',  bg: '#efe3c4', bgDk: '#d6c08e', ink: '#3a2810', red: '#7a2418', gold: '#c9963a', amber: '#b07a36', grain: '150,110,40',  edge: 'rgba(150,100,20,.35)', carve: 'rgba(255,250,230,.6)', trim: '#c9963a' },
+};
+const STYLE_KEYS = Object.keys(DICE_STYLES);
+// Effect colors per symbol
+const FX_COLOR = { ship: '#ffc94a', shield: '#dfe8ff', storm: '#7ab8ff', horn: '#e09a3a', home: '#ff7a3a' };
+
+// =====================================================================
+//  RENDERER / SCENE / CAMERA
+// =====================================================================
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#0d0a08');
+scene.fog = new THREE.Fog('#0d0a08', 22, 45); // fades the far floor into darkness, like a dim mead hall
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+
+// The 3D view lives in the band between the top HUD panel and the bottom action bar, so nothing hides behind them
+const UI_TOP = 118, UI_BOTTOM = 100;
+const camBase = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+const VIEW_CENTER_Z = -1.4;   // table + trays + bank row are centered a little north of the table's middle
+function resize() {
+  const w = innerWidth, h = Math.max(200, innerHeight - UI_TOP - UI_BOTTOM);
+  renderer.setSize(w, h);
+  Object.assign(renderer.domElement.style, { position: 'fixed', left: '0', top: `${UI_TOP}px` });
+  camera.aspect = w / h;
+  // Back the camera off far enough that everything (table, side trays, bank row) fits both horizontally and vertically
+  const vHalf = THREE.MathUtils.degToRad(camera.fov / 2);
+  const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
+  const dist = Math.max(13.6 / Math.tan(hHalf), 12.4 / Math.tan(vHalf));
+  // This is the resting camera; the main loop leans it toward the dice during a throw (see updateCamera)
+  camBase.pos.set(0, dist * 0.85, VIEW_CENTER_Z + dist * 0.55);
+  camBase.target.set(0, 0, VIEW_CENTER_Z);
+  camera.position.copy(camBase.pos);
+  camera.lookAt(camBase.target);
+  camera.updateProjectionMatrix();
+  // Fog starts just behind the scene, whatever the camera distance, so only the far floor fades out
+  scene.fog.near = dist + 6; scene.fog.far = dist + 30;
+  boltMat?.resolution.set(w, h);   // fat-line widths are in screen pixels, so they need the canvas size
+}
+addEventListener('resize', resize);
+
+// Lighting: cool fill, a warm shadow-casting "hearth" key light, a flickering torch,
+// and a blue flash light that stays dark until a storm die crackles
+scene.add(new THREE.HemisphereLight('#c9d4e8', '#3a2414', 1.1));
+const hearth = new THREE.DirectionalLight('#ffd49a', 3.2);
+hearth.position.set(-6, 16, 6);
+hearth.castShadow = true;
+hearth.shadow.mapSize.set(2048, 2048);
+Object.assign(hearth.shadow.camera, { left: -15, right: 15, top: 15, bottom: -15, near: 1, far: 45 });
+hearth.shadow.bias = -0.0005;
+scene.add(hearth);
+const torch = new THREE.PointLight('#ff8a3a', 60, 30, 1.6);
+torch.position.set(7, 5, -6);
+scene.add(torch);
+const flash = new THREE.PointLight('#9fd0ff', 0, 9, 1.5);
+scene.add(flash);
+// Lightning bolt material: 3px fat lines, added on top of what's behind them (additive) so they glow
+const boltMat = new LineMaterial({ color: 0xd6ecff, linewidth: 3, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+resize();
+
+// =====================================================================
+//  OCTAGON TABLE
+// =====================================================================
+// R = inradius (center to the middle of a flat wall). Flat sides face ±X / ±Z.
+const R = 7;
+const OCT = Math.PI / 8;                 // 22.5°: offset that puts flat edges (not corners) on the axes
+const SIDE_HALF = R * Math.tan(OCT);     // half the length of one inner wall
+const RC = R / Math.cos(OCT);            // circumradius (center to a corner)
+
+function canvas(size) { const c = document.createElement('canvas'); c.width = c.height = size; return [c, c.getContext('2d')]; }
+function tex(c) { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
+function octagonPath(g, cx, cy, circumR) {
+  g.beginPath();
+  for (let k = 0; k < 8; k++) {
+    const a = OCT + k * Math.PI / 4;
+    g.lineTo(cx + Math.cos(a) * circumR, cy + Math.sin(a) * circumR);
+  }
+  g.closePath();
+}
+// Wood: base color + many faint wavy grain lines along X
+function woodGrain(g, x, y, w, h, base, lines = 60) {
+  g.fillStyle = base; g.fillRect(x, y, w, h);
+  for (let i = 0; i < lines; i++) {
+    const yy = y + Math.random() * h, amp = 1 + Math.random() * 3, ph = Math.random() * 6;
+    g.strokeStyle = Math.random() < 0.6 ? 'rgba(0,0,0,.18)' : 'rgba(255,220,170,.06)';
+    g.lineWidth = 0.6 + Math.random() * 1.6;
+    g.beginPath();
+    for (let xx = x; xx <= x + w; xx += 8) g.lineTo(xx, yy + Math.sin(xx / 40 + ph) * amp);
+    g.stroke();
+  }
+}
+
+// Elder Futhark runes as straight strokes in a 0.5 × 1 box (y grows downward). Drawn by hand so no rune font is needed.
+const RUNES = [
+  [[[0,0],[0,1]], [[0,.35],[.45,.05]], [[0,.6],[.45,.3]]],                        // fehu
+  [[[0,1],[0,0],[.45,.28],[.45,1]]],                                              // uruz
+  [[[0,0],[0,1]], [[0,.25],[.4,.5],[0,.75]]],                                     // thurisaz
+  [[[0,0],[0,1]], [[0,0],[.4,.28]], [[0,.3],[.4,.58]]],                           // ansuz
+  [[[0,1],[0,0],[.4,.22],[0,.45],[.42,1]]],                                       // raido
+  [[[.4,.2],[0,.5],[.4,.8]]],                                                     // kaunan
+  [[[0,0],[.5,1]], [[.5,0],[0,1]]],                                               // gebo
+  [[[0,0],[0,1]], [[0,0],[.4,.22],[0,.45]]],                                      // wunjo
+  [[[0,0],[0,1]], [[.45,0],[.45,1]], [[0,.35],[.45,.65]]],                        // hagalaz
+  [[[.22,0],[.22,1]], [[0,.35],[.45,.6]]],                                        // naudiz
+  [[[.22,0],[.22,1]]],                                                            // isa
+  [[[.25,.1],[0,.35],[.25,.6]], [[.25,.4],[.5,.65],[.25,.9]]],                    // jera
+  [[[.22,0],[.22,1]], [[.22,0],[.45,.18]], [[0,.82],[.22,1]]],                    // eihwaz
+  [[[0,0],[0,1],[.3,.75],[.3,.25],[0,0]]],                                        // perthro (simplified)
+  [[[.25,1],[.25,0]], [[.25,.4],[0,0]], [[.25,.4],[.5,0]]],                       // algiz
+  [[[.4,0],[0,.38],[.4,.62],[0,1]]],                                              // sowilo
+  [[[.25,0],[.25,1]], [[0,.3],[.25,0],[.5,.3]]],                                  // tiwaz
+  [[[0,0],[0,1]], [[0,0],[.4,.25],[0,.5],[.4,.75],[0,1]]],                        // berkanan
+  [[[0,1],[0,0],[.25,.3],[.5,0],[.5,1]]],                                         // ehwaz
+  [[[0,0],[0,1]], [[.5,0],[.5,1]], [[0,0],[.5,.4]], [[.5,0],[0,.4]]],             // mannaz
+  [[[0,1],[0,0],[.4,.25]]],                                                       // laguz
+  [[[.25,.2],[.5,.5],[.25,.8],[0,.5],[.25,.2]]],                                  // ingwaz
+  [[[0,0],[0,1]], [[.6,0],[.6,1]], [[0,0],[.6,1]], [[.6,0],[0,1]]],               // dagaz
+  [[[.25,0],[.5,.3],[0,1]], [[.25,0],[0,.3],[.5,1]]],                             // othala
+];
+function drawRune(g, rune, x, y, h, angle) {
+  g.save(); g.translate(x, y); g.rotate(angle); g.translate(-h * 0.25, -h * 0.5);
+  for (const stroke of rune) {
+    g.beginPath();
+    for (const [px, py] of stroke) g.lineTo(px * h, py * h);
+    g.stroke();
+  }
+  g.restore();
+}
+
+function tableTexture() {
+  const S = 1024, [c, g] = canvas(S), mid = S / 2;
+  // Planks: vertical boards, each with its own tone, grain, and a dark seam
+  for (let i = 0; i < 8; i++) {
+    const tone = 48 + Math.random() * 14;
+    woodGrain(g, i * 128, 0, 128, S, `hsl(28, 40%, ${tone * 0.62}%)`, 40);
+    g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(i * 128, 0, 3, S);
+  }
+  // Painted ochre border: two octagons with a ring of runes between them
+  g.strokeStyle = 'rgba(196,84,44,.9)'; g.lineWidth = 7;
+  octagonPath(g, mid, mid, mid * 0.95); g.stroke();
+  octagonPath(g, mid, mid, mid * 0.78); g.stroke();
+  g.lineWidth = 4; g.lineCap = 'round'; g.lineJoin = 'round';
+  const ringR = mid * 0.83, count = 56;
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2;
+    drawRune(g, RUNES[i % RUNES.length], mid + Math.cos(a) * ringR, mid + Math.sin(a) * ringR, 28, a + Math.PI / 2);
+  }
+  // Faint eight-spoked sun wheel in the center
+  g.strokeStyle = 'rgba(176,74,40,.35)'; g.lineWidth = 6;
+  g.beginPath(); g.arc(mid, mid, 90, 0, Math.PI * 2); g.stroke();
+  for (let k = 0; k < 8; k++) {
+    const a = k * Math.PI / 4;
+    g.beginPath(); g.moveTo(mid, mid); g.lineTo(mid + Math.cos(a) * 140, mid + Math.sin(a) * 140); g.stroke();
+  }
+  // Darken toward the edge so the center reads as lit
+  const v = g.createRadialGradient(mid, mid, mid * 0.3, mid, mid, mid);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.45)');
+  g.fillStyle = v; g.fillRect(0, 0, S, S);
+  return tex(c);
+}
+// CircleGeometry with 8 segments IS an octagon; thetaStart rotates it so the flat sides face the axes
+const top = new THREE.Mesh(
+  new THREE.CircleGeometry(RC, 8, OCT),
+  new THREE.MeshStandardMaterial({ map: tableTexture(), roughness: 0.85 })
+);
+top.rotation.x = -Math.PI / 2;
+top.position.y = 0.001;
+top.receiveShadow = true;
+scene.add(top);
+
+function rimTexture() {
+  const [c, g] = canvas(512);
+  woodGrain(g, 0, 0, 512, 512, '#5a3820', 90);
+  return tex(c);
+}
+const darkWood = new THREE.MeshStandardMaterial({ map: rimTexture(), roughness: 0.7 });
+const iron = new THREE.MeshStandardMaterial({ color: '#4a4640', metalness: 0.85, roughness: 0.45 });
+
+// Table slab under the top (CylinderGeometry measures theta from +Z, so its offset is also 22.5°)
+const slab = new THREE.Mesh(new THREE.CylinderGeometry(RC + 1.0, RC + 0.8, 0.6, 8, 1, false, OCT), darkWood);
+slab.position.y = -0.3; slab.receiveShadow = true; scene.add(slab);
+
+// Floor: big dark planks fading into fog
+function floorTexture() {
+  const [c, g] = canvas(512);
+  for (let i = 0; i < 4; i++) {
+    woodGrain(g, 0, i * 128, 512, 128, '#1e140d', 25);
+    g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(0, i * 128, 512, 3);
+  }
+  const t = tex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(6, 6);
+  return t;
+}
+const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.MeshStandardMaterial({ map: floorTexture(), roughness: 0.9 }));
+floorMesh.rotation.x = -Math.PI / 2; floorMesh.position.y = -0.6; floorMesh.receiveShadow = true;
+scene.add(floorMesh);
+
+// Rim: 8 wall segments with iron rivets, plus a post with an iron cap at every corner
+const RIM_T = 0.8, RIM_H = 0.9;
+for (let k = 0; k < 8; k++) {
+  const a = k * Math.PI / 4, dx = Math.cos(a), dz = Math.sin(a);
+  const len = 2 * (R + RIM_T) * Math.tan(OCT);           // outer length, so neighbours overlap at the corners
+  const seg = new THREE.Mesh(new THREE.BoxGeometry(RIM_T, RIM_H, len), darkWood);
+  seg.position.set(dx * (R + RIM_T / 2), RIM_H / 2, dz * (R + RIM_T / 2));
+  seg.rotation.y = -a;                                    // local X now points outward from the center
+  seg.castShadow = seg.receiveShadow = true;
+  scene.add(seg);
+  for (const s of [-0.5, 0, 0.5]) {
+    const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), iron);
+    // walk along the wall: the wall's direction is the outward normal turned 90°
+    rivet.position.set(dx * (R + RIM_T / 2) - dz * s * SIDE_HALF, RIM_H, dz * (R + RIM_T / 2) + dx * s * SIDE_HALF);
+    scene.add(rivet);
+  }
+  const ca = a + OCT; // corners sit halfway between two wall directions
+  const cr = (R + RIM_T / 2) / Math.cos(OCT);
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 1.3, 10), darkWood);
+  post.position.set(Math.cos(ca) * cr, 0.65, Math.sin(ca) * cr);
+  post.castShadow = true; scene.add(post);
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(0.46, 0.4, 10), iron);
+  cap.position.set(post.position.x, 1.5, post.position.z); cap.castShadow = true; scene.add(cap);
+}
+
+// =====================================================================
+//  DICE FACES
+// =====================================================================
+// Each symbol is drawn into a 256×256 box. Separate functions so each is easy to tweak.
+const SYMBOLS = {
+  ship(g) {
+    // Hull: flat gunwale on top, curved keel below
+    g.fillStyle = INK;
+    g.beginPath(); g.moveTo(46, 158); g.quadraticCurveTo(128, 224, 210, 158); g.closePath(); g.fill();
+    // Curling prow and stern (draw one, mirror it for the other)
+    g.strokeStyle = INK; g.lineWidth = 10; g.lineCap = 'round';
+    for (const flip of [1, -1]) {
+      g.save(); if (flip < 0) { g.translate(256, 0); g.scale(-1, 1); }
+      g.beginPath(); g.moveTo(58, 170); g.bezierCurveTo(32, 150, 28, 112, 44, 92); g.stroke();
+      g.beginPath(); g.arc(54, 96, 10, Math.PI, Math.PI * 2.6); g.stroke();
+      g.restore();
+    }
+    // Mast and yard
+    g.lineWidth = 6;
+    g.beginPath(); g.moveTo(128, 160); g.lineTo(128, 40); g.stroke();
+    g.beginPath(); g.moveTo(80, 60); g.lineTo(176, 60); g.stroke();
+    // Striped square sail, slightly billowed
+    g.save();
+    g.beginPath(); g.moveTo(84, 64); g.lineTo(172, 64); g.quadraticCurveTo(184, 104, 170, 140); g.lineTo(86, 140); g.quadraticCurveTo(72, 104, 84, 64); g.closePath();
+    g.fillStyle = RED; g.fill(); g.clip();
+    g.fillStyle = BONE; for (let x = 92; x < 180; x += 24) g.fillRect(x, 60, 11, 90);
+    g.restore();
+    g.lineWidth = 4;
+    g.beginPath(); g.moveTo(84, 64); g.lineTo(172, 64); g.quadraticCurveTo(184, 104, 170, 140); g.lineTo(86, 140); g.quadraticCurveTo(72, 104, 84, 64); g.stroke();
+    // Row of shields along the side
+    for (let i = 0; i < 5; i++) {
+      g.beginPath(); g.arc(76 + i * 26, 160, 10, 0, Math.PI * 2);
+      g.fillStyle = i % 2 ? RED : GOLD; g.fill(); g.lineWidth = 3; g.stroke();
+    }
+    // Waves
+    g.lineWidth = 5;
+    g.beginPath();
+    for (let x = 30; x <= 226; x += 4) g.lineTo(x, 212 + Math.sin(x / 9) * 4);
+    g.stroke();
+  },
+  shield(g) {
+    const cx = 128, cy = 128, r = 92;
+    // Four painted quarters
+    for (let q = 0; q < 4; q++) {
+      g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, r, q * Math.PI / 2 + Math.PI / 4, (q + 1) * Math.PI / 2 + Math.PI / 4);
+      g.fillStyle = q % 2 ? RED : BONE_DK; g.fill();
+    }
+    // Plank lines
+    g.strokeStyle = 'rgba(42,27,18,.35)'; g.lineWidth = 2;
+    for (let x = cx - r + 20; x < cx + r; x += 20) { g.beginPath(); g.moveTo(x, cy - r); g.lineTo(x, cy + r); g.stroke(); }
+    // Iron rim with rivets
+    g.strokeStyle = INK; g.lineWidth = 12;
+    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = BONE;
+    for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; g.beginPath(); g.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 3, 0, Math.PI * 2); g.fill(); }
+    // Central boss with a highlight
+    g.fillStyle = INK; g.beginPath(); g.arc(cx, cy, 26, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = GOLD; g.lineWidth = 4; g.beginPath(); g.arc(cx, cy, 18, Math.PI * 1.1, Math.PI * 1.6); g.stroke();
+  },
+  storm(g) {
+    // Cloud: union of overlapping circles + a rounded base, filled as one shape
+    g.fillStyle = INK;
+    g.beginPath();
+    for (const [x, y, r] of [[86, 104, 34], [130, 82, 46], [176, 106, 32]]) { g.moveTo(x + r, y); g.arc(x, y, r, 0, Math.PI * 2); }
+    g.roundRect(54, 100, 152, 44, 22);
+    g.fill();
+    // Rain
+    g.strokeStyle = INK; g.lineWidth = 6; g.lineCap = 'round';
+    for (const [x, y] of [[72, 162], [92, 172], [180, 160], [200, 170], [84, 200], [190, 198]]) {
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x - 8, y + 18); g.stroke();
+    }
+    // Lightning bolt
+    g.beginPath();
+    [[142, 128], [104, 186], [130, 186], [110, 240], [170, 168], [144, 168], [166, 128]].forEach(([x, y]) => g.lineTo(x, y));
+    g.closePath();
+    g.fillStyle = GOLD; g.fill(); g.lineWidth = 4; g.lineJoin = 'round'; g.stroke();
+  },
+  home(g) {
+    // Steep longhouse roof
+    g.fillStyle = INK;
+    g.beginPath(); g.moveTo(36, 142); g.lineTo(128, 50); g.lineTo(220, 142); g.closePath(); g.fill();
+    // Thatch rows
+    g.save(); g.clip();
+    g.strokeStyle = 'rgba(230,214,178,.35)'; g.lineWidth = 2;
+    for (let y = 70; y < 142; y += 14) { g.beginPath(); g.moveTo(30, y); g.lineTo(226, y); g.stroke(); }
+    g.restore();
+    // Crossed gable boards extending past the peak, ending in carved curls
+    g.strokeStyle = INK; g.lineWidth = 9; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(36, 142); g.lineTo(146, 32); g.stroke();
+    g.beginPath(); g.moveTo(220, 142); g.lineTo(110, 32); g.stroke();
+    g.lineWidth = 6;
+    g.beginPath(); g.arc(152, 34, 7, Math.PI * 0.9, Math.PI * 2.3); g.stroke();
+    g.beginPath(); g.arc(104, 34, 7, Math.PI * 0.7, Math.PI * -1.1, true); g.stroke();
+    // Plank walls
+    g.fillStyle = AMBER; g.fillRect(62, 142, 132, 62);
+    g.strokeStyle = 'rgba(42,27,18,.6)'; g.lineWidth = 3;
+    for (let x = 78; x < 194; x += 16) { g.beginPath(); g.moveTo(x, 142); g.lineTo(x, 204); g.stroke(); }
+    g.strokeStyle = INK; g.lineWidth = 6; g.strokeRect(62, 142, 132, 62);
+    // Arched door
+    g.fillStyle = INK; g.beginPath(); g.moveTo(112, 204); g.lineTo(112, 172); g.arc(128, 172, 16, Math.PI, 0); g.lineTo(144, 204); g.fill();
+    // Ground line
+    g.lineWidth = 6; g.beginPath(); g.moveTo(36, 206); g.lineTo(220, 206); g.stroke();
+  },
+  horn(g) {
+    // Horn body: a tapered band around a curved centerline (quadratic Bézier from mouth to tip)
+    const P0 = [196, 62], P1 = [204, 206], P2 = [56, 168];
+    const at = t => {
+      const u = 1 - t;
+      const p = [u*u*P0[0] + 2*u*t*P1[0] + t*t*P2[0], u*u*P0[1] + 2*u*t*P1[1] + t*t*P2[1]];
+      const d = [2*u*(P1[0]-P0[0]) + 2*t*(P2[0]-P1[0]), 2*u*(P1[1]-P0[1]) + 2*t*(P2[1]-P1[1])];
+      const len = Math.hypot(d[0], d[1]);
+      return { p, n: [-d[1] / len, d[0] / len], w: 28 * (1 - t) + 4 }; // n = normal; w = half-width (wide mouth → thin tip)
+    };
+    const left = [], right = [];
+    for (let i = 0; i <= 40; i++) {
+      const { p, n, w } = at(i / 40);
+      left.push([p[0] + n[0] * w, p[1] + n[1] * w]);
+      right.push([p[0] - n[0] * w, p[1] - n[1] * w]);
+    }
+    // Carrying strap hanging beneath
+    g.strokeStyle = INK; g.lineWidth = 4;
+    const s0 = at(0.18).p, s1 = at(0.82).p;
+    g.beginPath(); g.moveTo(s0[0], s0[1]); g.quadraticCurveTo(110, 250, s1[0], s1[1]); g.stroke();
+    // Body
+    g.beginPath(); [...left, ...right.reverse()].forEach(([x, y]) => g.lineTo(x, y)); g.closePath();
+    g.fillStyle = AMBER; g.fill(); g.lineWidth = 5; g.lineJoin = 'round'; g.stroke();
+    // Gold bands: ink outline first, gold on top
+    for (const t of [0.07, 0.15, 0.82]) {
+      const { p, n, w } = at(t);
+      const a = [p[0] + n[0] * (w + 3), p[1] + n[1] * (w + 3)], b = [p[0] - n[0] * (w + 3), p[1] - n[1] * (w + 3)];
+      for (const [col, lw] of [[INK, 12], [GOLD, 6]]) {
+        g.strokeStyle = col; g.lineWidth = lw; g.lineCap = 'round';
+        g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+      }
+    }
+    // Dark opening at the mouth, plus a gold tip cap
+    const m = at(0);
+    g.fillStyle = INK; g.beginPath();
+    g.ellipse(m.p[0], m.p[1], m.w + 2, 9, Math.atan2(m.n[1], m.n[0]), 0, Math.PI * 2); g.fill();
+    g.fillStyle = GOLD; g.beginPath(); g.arc(P2[0], P2[1], 7, 0, Math.PI * 2); g.fill(); g.stroke();
+  },
+};
+const LABELS = { ship: 'Ship', shield: 'Shield', storm: 'Storm', home: 'Home', horn: 'Horn' };
+
+// Face background with grain + edge shading, then the symbol "carved" on top, in the given dice style
+function faceCanvas(symbol, styleKey = 'bone') {
+  const st = DICE_STYLES[styleKey];
+  [BONE, BONE_DK, INK, RED, GOLD, AMBER] = [st.bg, st.bgDk, st.ink, st.red, st.gold, st.amber];   // the symbols draw with these
+  const [c, g] = canvas(256);
+  g.fillStyle = BONE; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 70; i++) {
+    g.strokeStyle = `rgba(${st.grain},${0.04 + Math.random() * 0.08})`; g.lineWidth = 1 + Math.random() * 2;
+    const y = Math.random() * 256; g.beginPath(); g.moveTo(0, y); g.bezierCurveTo(80, y + 6, 170, y - 6, 256, y + Math.random() * 8); g.stroke();
+  }
+  const grad = g.createRadialGradient(128, 128, 90, 128, 128, 190);
+  grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(1, st.edge);
+  g.fillStyle = grad; g.fillRect(0, 0, 256, 256);
+  if (st.trim) { g.strokeStyle = st.trim; g.lineWidth = 9; g.strokeRect(14, 14, 228, 228); }   // gold inlay border
+  // Shrink the symbol a bit so it stays off the rounded edges; an offset highlight/shadow makes it look carved in
+  g.save();
+  g.translate(128, 128); g.scale(0.9, 0.9); g.translate(-128, -128);
+  g.shadowColor = st.carve; g.shadowOffsetX = 2; g.shadowOffsetY = 2;
+  SYMBOLS[symbol](g);
+  g.restore();
+  return c;
+}
+// BoxGeometry face order is +X, -X, +Y, -Y, +Z, -Z. The two ships sit on opposite faces.
+const FACES = ['ship', 'ship', 'shield', 'storm', 'home', 'horn'];
+const FACE_NORMALS = [[1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]].map(a => new THREE.Vector3(...a));
+// styleTextures[style][symbol] → texture, for every dice style
+const styleCanvases = Object.fromEntries(STYLE_KEYS.map(k => [k, Object.fromEntries(Object.keys(SYMBOLS).map(s => [s, faceCanvas(s, k)]))]));
+const styleTextures = Object.fromEntries(STYLE_KEYS.map(k => [k, Object.fromEntries(Object.entries(styleCanvases[k]).map(([s, c]) => [s, tex(c)]))]));
+const styleSwatch = Object.fromEntries(STYLE_KEYS.map(k => [k, styleCanvases[k].ship.toDataURL()]));   // lobby picker images
+const iconURLs = Object.fromEntries(Object.entries(styleCanvases.bone).map(([s, c]) => [s, c.toDataURL()]));   // HUD icons stay bone
+const ico = s => `<img class="ico" src="${iconURLs[s]}" alt="${LABELS[s]}">`;
+// Rounded cube: 4 segments per edge, corner radius 0.12. It keeps BoxGeometry's per-face groups, so the 6 materials still map 1:1.
+const dieGeo = new RoundedBoxGeometry(1, 1, 1, 4, 0.12);
+
+// Which face points up? Rotate each local face normal into world space; the one with the largest Y wins.
+const _v = new THREE.Vector3(), _q = new THREE.Quaternion();
+function topFace(q) {
+  _q.set(q.x, q.y, q.z, q.w);
+  let best = -Infinity, idx = 0;
+  FACE_NORMALS.forEach((n, i) => {
+    const up = _v.copy(n).applyQuaternion(_q).y;
+    if (up > best) { best = up; idx = i; }
+  });
+  return { idx, flatness: best }; // flatness ~1 = flat on the table, <0.95 = leaning ("cocked")
+}
+
+// =====================================================================
+//  PHYSICS — a throw is simulated instantly, recorded, then played back.
+//  Only the host simulates; everyone plays the same recording, so every
+//  screen shows the exact same tumble and result.
+// =====================================================================
+function makeWorld() {
+  const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -40, 0) }); // stronger than real g = snappier rolls at this scale
+  world.allowSleep = true; // bodies that stop moving go to sleep -> how we detect "settled"
+  const floorMat = new CANNON.Material('floor'), wallMat = new CANNON.Material('wall'), diceMat = new CANNON.Material('dice');
+  world.addContactMaterial(new CANNON.ContactMaterial(floorMat, diceMat, { friction: 0.35, restitution: 0.3 }));
+  world.addContactMaterial(new CANNON.ContactMaterial(wallMat,  diceMat, { friction: 0.1,  restitution: 0.6 }));
+  world.addContactMaterial(new CANNON.ContactMaterial(diceMat,  diceMat, { friction: 0.2,  restitution: 0.4 }));
+  const floor = new CANNON.Body({ type: CANNON.Body.STATIC, shape: new CANNON.Plane(), material: floorMat });
+  floor.quaternion.setFromEuler(-Math.PI / 2, 0, 0); // plane faces +Z by default; rotate to face up
+  world.addBody(floor);
+  // Eight invisible tall walls, one per octagon side, rotated to face the center
+  for (let k = 0; k < 8; k++) {
+    const a = k * Math.PI / 4;
+    const b = new CANNON.Body({ type: CANNON.Body.STATIC, material: wallMat,
+      shape: new CANNON.Box(new CANNON.Vec3(0.5, 10, SIDE_HALF * 1.3)) });
+    b.position.set(Math.cos(a) * (R + 0.5), 10, Math.sin(a) * (R + 0.5));
+    b.quaternion.setFromEuler(0, -a, 0);
+    world.addBody(b);
+  }
+  return { world, diceMat };
+}
+
+const rand = (a, b) => a + Math.random() * (b - a);
+const STEP = 1 / 120, REC_EVERY = 2; // simulate at 120 Hz, record every 2nd step = 60 fps playback
+
+// Where a hand throw starts and which way it flies. Shared by the physics (host) and the releasing hand animation
+// (thrower's screen), so the held dice line up where the simulated dice will actually start.
+// hand = where the player let go and how fast the mouse was moving: { x, z, vx, vz }
+function aimFromHand(hand) {
+  const num = v => Number.isFinite(v) ? v : 0;
+  // Start where they let go, kept well inside the walls
+  let sx = num(hand.x), sz = num(hand.z);
+  const r = Math.hypot(sx, sz);
+  if (r > 4) { sx *= 4 / r; sz *= 4 / r; }
+  const v = Math.hypot(num(hand.vx), num(hand.vz));
+  if (v < 3) {
+    // Barely moving = a gentle drop: lob toward the middle of the table (straight "forward", if already in the middle)
+    const a = Math.hypot(sx, sz) > 0.5 ? Math.atan2(-sz, -sx) : -Math.PI / 2;
+    return { sx, sz, dir: { x: Math.cos(a), z: Math.sin(a) }, speed: rand(7, 11) };
+  }
+  // Fly the way the mouse was flicking; a harder flick = a harder throw, within limits
+  return { sx, sz, dir: { x: num(hand.vx) / v, z: num(hand.vz) / v }, speed: THREE.MathUtils.clamp(v * 0.6, 8, 22) };
+}
+// Starting spot of die i: a 4-wide, 2-deep handful facing the throw direction, so dice never spawn overlapping
+function spawnSlot(i, { sx, sz, dir }) {
+  const col = i % 4, row = Math.floor(i / 4), perp = { x: -dir.z, z: dir.x };
+  const across = (col - 1.5) * 1.15, back = row * 1.15;
+  return new THREE.Vector3(sx + perp.x * across - dir.x * back, 2.8 + row * 0.4, sz + perp.z * across - dir.z * back);
+}
+
+function simulateThrow(n, hand) {
+  const { world, diceMat } = makeWorld();
+  let dir, speed, sx, sz;
+  if (hand) {
+    ({ dir, speed, sx, sz } = aimFromHand(hand));
+  } else {
+    // Button throw: pick a side of the table to throw FROM, aim roughly at the middle with some spread
+    const from = Math.random() * Math.PI * 2;
+    const aim = from + Math.PI + rand(-0.5, 0.5);
+    dir = { x: Math.cos(aim), z: Math.sin(aim) }; speed = rand(10, 19);
+    const startR = rand(3.2, 4.4);
+    sx = Math.cos(from) * startR; sz = Math.sin(from) * startR;
+  }
+  const bodies = [], lastHit = [], events = [];
+  let frame = 0;
+  for (let i = 0; i < n; i++) {
+    const body = new CANNON.Body({
+      mass: 1, material: diceMat, shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)),
+      linearDamping: 0.1, angularDamping: 0.1, sleepSpeedLimit: 0.15, sleepTimeLimit: 0.25,
+    });
+    const p = spawnSlot(i, { sx, sz, dir });
+    body.position.set(p.x + rand(-0.08, 0.08), p.y + rand(-0.3, 0.3), p.z + rand(-0.08, 0.08));
+    body.quaternion.setFromEuler(rand(0, 6.28), rand(0, 6.28), rand(0, 6.28));
+    const s = speed * rand(0.85, 1.15);
+    body.velocity.set(dir.x * s + rand(-2, 2), rand(-1, 3), dir.z * s + rand(-2, 2));
+    body.angularVelocity.set(rand(-25, 25), rand(-25, 25), rand(-25, 25));
+    // Remember impacts (for the clack sounds), at most one per die every 4 frames
+    body.addEventListener('collide', e => {
+      const v = Math.abs(e.contact.getImpactVelocityAlongNormal());
+      if (v > 1.2 && frame - (lastHit[i] ?? -99) > 4) { events.push([frame, v]); lastHit[i] = frame; }
+    });
+    world.addBody(body); bodies.push(body);
+  }
+
+  const rec = [];
+  const nudges = new Array(n).fill(0);
+  for (let step = 0; step < 14 / STEP; step++) {
+    world.step(STEP);
+    if (step % REC_EVERY === 0) {
+      for (const b of bodies) rec.push(b.position.x, b.position.y, b.position.z, b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+      frame++;
+    }
+    if (step % 12 === 0 && bodies.every(b => b.sleepState === CANNON.Body.SLEEPING)) {
+      // A die resting tilted against a wall or another die is "cocked" — nudge it and keep simulating
+      const cocked = bodies.filter((b, i) => topFace(b.quaternion).flatness < 0.95 && nudges[i]++ < 6);
+      if (!cocked.length) break;
+      for (const b of cocked) {
+        b.wakeUp();
+        b.velocity.set(rand(-2, 2), 4, rand(-2, 2));
+        b.angularVelocity.set(rand(-8, 8), rand(-8, 8), rand(-8, 8));
+      }
+    }
+  }
+  events.sort((a, b) => a[0] - b[0]);
+  // Pack into 16-bit ints (positions ×100, quaternions ×32767) — about 4× smaller to send than JSON floats
+  const data = new Int16Array(rec.length);
+  for (let i = 0; i < rec.length; i++) data[i] = Math.round(rec[i] * (i % 7 < 3 ? 100 : 32767));
+  const tops = bodies.map(b => topFace(b.quaternion).idx);
+  return { n, frames: frame, data: data.buffer, events, tops };
+}
+
+// =====================================================================
+//  GAME RULES (only the host runs these; everyone else just displays state)
+// =====================================================================
+function countFaces(faces) {
+  const c = { ship: 0, shield: 0, storm: 0, home: 0, horn: 0 };
+  for (const f of faces) c[f]++;
+  return c;
+}
+const curPlayer = s => s.players[s.turnIdx];
+
+// pool    = dice you still own this turn (storms and spent homes leave it for good)
+// resting = horn dice from your last throw, sitting out the next throw only
+const throwable = t => t.pool - t.resting;
+
+function startTurn(s) {
+  s.turn = { pool: START_DICE, resting: 0, stormed: 0, homesSpent: 0, homesLeft: 0, unbanked: 0, throws: 0, last: null };
+  s.phase = 'ready';
+}
+
+function resolveThrow(s, faces) {
+  const t = s.turn, p = curPlayer(s), c = countFaces(faces);
+  t.throws++;
+  // Every SHIELDS_PER_STORM shields protect one storm die from being lost
+  const blocked = Math.min(c.storm, Math.floor(c.shield / SHIELDS_PER_STORM));
+  const lost = c.storm - blocked;
+  t.pool -= lost;
+  t.stormed += lost;
+  t.resting = c.horn;   // last throw's resting dice come back; this throw's horns take their place
+  const out = { faces, ships: c.ship, shields: c.shield, blocked, lost, horns: c.horn, homes: c.home, bust: c.ship === 0 };
+  if (out.bust) {
+    out.goldLost = t.unbanked;
+    t.unbanked = 0;
+    t.homesLeft = 0;
+    s.phase = 'bust';
+    addLog(s, `${p.name} rolled no ships — bust${out.goldLost ? `, lost ${out.goldLost} gold` : ''}`);
+  } else {
+    t.unbanked += c.ship;
+    t.homesLeft = c.home;
+    s.phase = 'decide';
+  }
+  t.last = out;
+  return out;
+}
+
+function spendHome(s) {
+  const t = s.turn, p = curPlayer(s), amount = t.unbanked;
+  p.banked += amount; t.unbanked = 0;
+  t.homesLeft--; t.homesSpent++; t.pool--;
+  addLog(s, `${p.name} brought ${amount} gold home`);
+  return amount;
+}
+
+// With one die left, a home roll means no ship = bust, so that gold could never be banked.
+// Once you own fewer than MIN_DICE dice the turn ends and any gold still at sea is lost.
+// Called after a throw resolves and after a home is spent; returns null if play continues.
+function checkOutOfDice(s) {
+  const t = s.turn;
+  if (s.phase !== 'decide' || t.pool >= MIN_DICE) return null;
+  const goldLost = t.unbanked;
+  t.unbanked = 0; t.homesLeft = 0;
+  s.phase = 'out';
+  addLog(s, `${curPlayer(s).name} is down to ${t.pool} die${goldLost ? ` — ${goldLost} gold lost at sea` : ''}`);
+  return { goldLost };
+}
+
+function endTurn(s) {
+  s.turnIdx++;
+  if (s.turnIdx >= s.players.length) { s.turnIdx = 0; s.round++; }
+  if (s.round > s.rounds) { s.phase = 'over'; s.turn = null; return; }
+  startTurn(s);
+}
+
+function addLog(s, msg) { s.log.push(msg); if (s.log.length > 6) s.log.shift(); }
+
+// =====================================================================
+//  NETWORK — PeerJS (WebRTC peer-to-peer). The host's browser is the
+//  authority: clients send actions, the host applies the rules and
+//  broadcasts state (and recorded throws) to everyone.
+// =====================================================================
+const PREFIX = 'runedice-v1-';
+let peer = null, myId = 'local', isHost = false, hostConn = null;
+const conns = new Map();            // host only: peerId -> DataConnection
+let S = null;                       // host only: the authoritative game state
+
+function newRoom(code) {
+  return { phase: 'lobby', code, rounds: 5, round: 0, turnIdx: 0, players: [], turn: null, log: [], seq: 0 };
+}
+function addPlayer(name, owner) {
+  // Default dice styles go round-robin so players start out looking different; they can change it in the lobby
+  S.players.push({ id: Math.random().toString(36).slice(2, 8), name: name || `Viking ${S.players.length + 1}`, owner, banked: 0,
+                   style: STYLE_KEYS[S.players.length % STYLE_KEYS.length], hand: 'handful' });
+}
+const ownerOnline = owner => owner === myId || conns.has(owner);
+
+// Host: send a message to every client and to ourselves (through the same queue clients use)
+function broadcast(msg) {
+  S.seq++;
+  msg.state = structuredClone(S);
+  msg.state.online = S.players.map(p => ownerOnline(p.owner));
+  for (const c of conns.values()) if (c.open) c.send(msg);
+  enqueue(msg);
+}
+const broadcastState = fx => broadcast({ t: 'state', fx });
+
+function hostAct(from, a, arg) {
+  if (!S) return;
+  // Live, cosmetic messages: passed straight on to everyone, never queued behind animations
+  if (a === 'shake') return relayShake(from, arg);
+  if (a === 'emote') return relayEmote(from, arg);
+  // Lobby / host-only actions
+  if (a === 'join') {
+    if (S.phase === 'lobby' && S.players.length < 8) addPlayer(arg, from);
+    return broadcastState();
+  }
+  if (from !== myId && ['addLocal', 'remove', 'rounds', 'start', 'again'].includes(a)) return;
+  if (a === 'addLocal') { if (S.phase === 'lobby' && S.players.length < 8) addPlayer(arg, myId); return broadcastState(); }
+  if (a === 'remove')   { S.players = S.players.filter(p => p.id !== arg); return broadcastState(); }
+  if (a === 'rounds')   { S.rounds = +arg; return broadcastState(); }
+  if (a === 'style') {   // anyone may restyle their own players; the host may restyle anyone
+    const p = S.players.find(p => p.id === arg?.pid);
+    if (p && DICE_STYLES[arg.style] && (p.owner === from || from === myId)) { p.style = arg.style; broadcastState(); }
+    return;
+  }
+  if (a === 'hand') {    // same permissions for the shake style
+    const p = S.players.find(p => p.id === arg?.pid);
+    if (p && HAND_STYLES[arg.hand] && (p.owner === from || from === myId)) { p.hand = arg.hand; broadcastState(); }
+    return;
+  }
+  if (a === 'start' || a === 'again') {
+    if (!S.players.length) return;
+    S.players.forEach(p => { p.banked = 0; });
+    S.round = 1; S.turnIdx = 0; S.log = [];
+    startTurn(S);
+    broadcastState({ type: 'turnStart' });
+    if (S.phase === 'skip') scheduleAdvance();
+    return;
+  }
+
+  // Turn actions: only the current player's owner (or the host, standing in for someone who disconnected)
+  const p = S.turn && curPlayer(S);
+  if (!p || !(p.owner === from || (from === myId && !ownerOnline(p.owner)))) return;
+  const t = S.turn;
+  if (a === 'throw' && (S.phase === 'ready' || S.phase === 'decide') && throwable(t) > 0) {
+    const sim = simulateThrow(throwable(t), arg);   // arg = the hand release, if they threw with the mouse
+    const outcome = resolveThrow(S, sim.tops.map(i => FACES[i]));
+    outcome.out = checkOutOfDice(S);
+    broadcast({ t: 'roll', sim, outcome });
+    if (S.phase === 'bust' || S.phase === 'out') scheduleAdvance(sim.frames / 60 * 1000 + 6500);
+  } else if (a === 'home' && S.phase === 'decide' && t.homesLeft > 0 && t.unbanked > 0) {
+    const amount = spendHome(S);
+    const out = checkOutOfDice(S);
+    broadcastState({ type: 'home', amount, out });
+    if (out) scheduleAdvance(5000);
+  }
+}
+// After a bust (or a skipped turn) the host moves play on automatically
+function scheduleAdvance(ms = 2800) {
+  const seq = S.seq;
+  setTimeout(() => {
+    if (S.seq !== seq) return;
+    endTurn(S);
+    broadcastState({ type: 'turnStart' });
+    if (S.phase === 'skip') scheduleAdvance();
+  }, ms);
+}
+
+// Send an action: the host handles it directly, clients forward it to the host
+function act(a, arg) {
+  audio();
+  if (isHost) hostAct(myId, a, arg);
+  else if (hostConn?.open) hostConn.send({ t: 'act', a, arg });
+}
+
+function randomCode() { const L = 'ABCDEFGHJKMNPQRSTUVWXYZ'; return Array.from({ length: 4 }, () => L[Math.floor(Math.random() * L.length)]).join(''); }
+
+function startLocal(name) {
+  isHost = true; myId = 'local';
+  S = newRoom(null);
+  addPlayer(name, myId);
+  showLobby();
+  broadcastState();
+}
+
+function startHost(name, tries = 0) {
+  if (!window.Peer) return setErr('startErr', 'Could not load the networking library (are you offline?). Try "Play locally".');
+  const code = randomCode();
+  setErr('startErr', 'Opening the mead hall…');
+  peer = new Peer(PREFIX + code);
+  peer.on('open', id => {
+    isHost = true; myId = id;
+    S = newRoom(code);
+    addPlayer(name, myId);
+    showLobby();
+    broadcastState();
+  });
+  peer.on('connection', conn => {
+    conn.on('open', () => { conns.set(conn.peer, conn); broadcastState(); });
+    conn.on('data', m => { if (m?.t === 'act') hostAct(conn.peer, m.a, m.arg); });
+    conn.on('close', () => { conns.delete(conn.peer); if (S) broadcastState(); });
+  });
+  peer.on('error', e => {
+    if (e.type === 'unavailable-id' && tries < 3) { peer.destroy(); return startHost(name, tries + 1); }
+    setErr(S ? 'lobbyErr' : 'startErr', `Network error: ${e.type}`);
+  });
+}
+
+function startJoin(name, code) {
+  if (!window.Peer) return setErr('startErr', 'Could not load the networking library (are you offline?).');
+  if (code.length !== 4) return setErr('startErr', 'Enter the 4-letter code from the host.');
+  setErr('startErr', 'Sailing to the host…');
+  peer = new Peer();
+  peer.on('open', id => {
+    myId = id;
+    hostConn = peer.connect(PREFIX + code, { reliable: true });
+    hostConn.on('open', () => { hostConn.send({ t: 'act', a: 'join', arg: name }); showLobby(); });
+    hostConn.on('data', m => m?.t === 'shake' ? onShake(m) : m?.t === 'emote' ? onEmote(m) : enqueue(m));
+    hostConn.on('close', () => { setErr('lobbyErr', 'Lost connection to the host.'); showBanner('Disconnected', 'Lost connection to the host', '#c0452e'); });
+  });
+  peer.on('error', e => setErr('startErr', e.type === 'peer-unavailable' ? 'No game with that code.' : `Network error: ${e.type}`));
+}
+
+// =====================================================================
+//  MESSAGE QUEUE — every screen processes host messages one at a time,
+//  so a roll's animation finishes before the next state is shown.
+// =====================================================================
+const queue = [];
+let busy = false;
+let view = null;      // the state this screen is currently showing
+function enqueue(msg) { queue.push(msg); if (!busy) pump(); }
+async function pump() {
+  busy = true;
+  while (queue.length) {
+    const msg = queue.shift();
+    try { await handle(msg); } catch (e) { console.error(e); }
+  }
+  busy = false;
+}
+
+async function handle(msg) {
+  if (msg.t === 'roll') {
+    clearHands();   // the held dice (mine or someone else's) become the thrown dice
+    // Keep showing the old numbers (and hide the buttons) until the dice land — no spoilers
+    view = { ...(view?.turn ? view : msg.state), phase: 'animating' }; render();
+    await playTrack(msg.sim);
+    await playOutcome(msg.outcome);
+    view = msg.state; render(); syncSpots(view);
+    return;
+  }
+  // Plain state update
+  view = msg.state;
+  if (msg.fx?.type === 'turnStart') {
+    clearTable();
+    clearHands();
+    syncSpots(view);   // new turn: empty trays and sea, banks show everyone's totals
+    if (view.phase === 'over') return showGameOver();
+    showBanner(`${esc(curPlayer(view).name)}'s turn`, `Round ${view.round} of ${view.rounds}`, '#c9963a');
+    SFX.turn();
+  }
+  if (msg.fx?.type === 'home') {
+    render();
+    await homeEffect(msg.fx.amount);
+    if (msg.fx.out) { await wait(600); outOfDiceBanner(msg.fx.out); }
+  }
+  render();
+  syncSpots(view);   // catch-up: makes the 3D spots exactly match the state once animations are done
+}
+
+// =====================================================================
+//  TABLE DICE (display) + PLAYBACK
+// =====================================================================
+let tableDice = [];
+let playback = null;
+const haloTex = (() => {
+  const [c, g] = canvas(128);
+  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+})();
+
+// Dice on the table are always in the style of the player whose turn it is
+const curStyle = () => view?.players?.[view.turnIdx]?.style || 'bone';
+function makeDie(style = curStyle()) {
+  // Each die gets its own 6 materials so its faces can glow / fade independently.
+  // emissiveMap = the face picture, so a glowing face lights up its own symbol.
+  const tx = styleTextures[style] || styleTextures.bone;
+  const mats = FACES.map(s => new THREE.MeshStandardMaterial({ map: tx[s], emissiveMap: tx[s], emissive: 0x000000, roughness: 0.45 }));
+  const mesh = new THREE.Mesh(dieGeo, mats);
+  mesh.castShadow = true;
+  scene.add(mesh);
+  return { mesh, mats, halo: null, top: 0, face: null, gone: false, spent: false };
+}
+function clearTable() {
+  for (const d of tableDice) { removeHomeHint(d); scene.remove(d.mesh); d.mats.forEach(m => m.dispose()); if (d.halo) scene.remove(d.halo); }
+  tableDice = [];
+  effects.length = 0;
+  flash.intensity = 0;
+}
+
+function playTrack(sim) {
+  clearTable();
+  for (let i = 0; i < sim.n; i++) tableDice.push(makeDie());
+  return new Promise(resolve => {
+    playback = { sim, data: new Int16Array(sim.data), start: performance.now(), nextEvent: 0, resolve };
+  });
+}
+const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion();
+function updatePlayback(now) {
+  const { sim, data } = playback;
+  const f = Math.min((now - playback.start) / 1000 * 60, sim.frames - 1);
+  const i0 = Math.floor(f), i1 = Math.min(i0 + 1, sim.frames - 1), a = f - i0;
+  // Interpolate between recorded frames so playback is smooth on 120/144 Hz screens too
+  for (let d = 0; d < sim.n; d++) {
+    const o0 = (i0 * sim.n + d) * 7, o1 = (i1 * sim.n + d) * 7, m = tableDice[d].mesh;
+    m.position.set(
+      THREE.MathUtils.lerp(data[o0] / 100, data[o1] / 100, a),
+      THREE.MathUtils.lerp(data[o0 + 1] / 100, data[o1 + 1] / 100, a),
+      THREE.MathUtils.lerp(data[o0 + 2] / 100, data[o1 + 2] / 100, a));
+    _qa.set(data[o0 + 3], data[o0 + 4], data[o0 + 5], data[o0 + 6]).normalize();
+    _qb.set(data[o1 + 3], data[o1 + 4], data[o1 + 5], data[o1 + 6]).normalize();
+    m.quaternion.slerpQuaternions(_qa, _qb, a);
+  }
+  while (playback.nextEvent < sim.events.length && sim.events[playback.nextEvent][0] <= f) SFX.clack(sim.events[playback.nextEvent++][1]);
+  if (f >= sim.frames - 1) {
+    tableDice.forEach((d, i) => { d.top = sim.tops[i]; d.face = FACES[d.top]; });
+    const r = playback.resolve; playback = null; r();
+  }
+}
+
+// =====================================================================
+//  SPOTS AROUND THE TABLE
+//  West: horn tray ("Mead bench") + storm tray ("Lost to the storm")
+//  East: "At sea" plate for unclaimed gold
+//  North row: one bank plate per player for claimed gold
+//  Every spot is a pedestal whose top sits level with the tabletop (y = 0).
+// =====================================================================
+const HORN_TRAY = new THREE.Vector3(-10.3, 0, -2.7), STORM_TRAY = new THREE.Vector3(-10.3, 0, 2.7);
+const AT_SEA = new THREE.Vector3(10.3, 0, 0);
+const BANK_ROW_Z = -10.9;
+const UP = new THREE.Vector3(0, 1, 0);
+const ease = t => t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;   // smooth start and stop
+
+function makeTray(pos, feltColor) {
+  const g = new THREE.Group(); g.position.copy(pos);
+  const base = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.6, 5), darkWood);
+  base.position.y = -0.3; base.receiveShadow = true; g.add(base);
+  const felt = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 4.7), new THREE.MeshStandardMaterial({ color: feltColor, roughness: 0.95 }));
+  felt.rotation.x = -Math.PI / 2; felt.position.y = 0.005; felt.receiveShadow = true; g.add(felt);
+  // Four low walls around the edge
+  for (const [w, d, x, z] of [[2.8, 0.15, 0, -2.43], [2.8, 0.15, 0, 2.43], [0.15, 5, -1.33, 0], [0.15, 5, 1.33, 0]]) {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 0.35, d), darkWood);
+    wall.position.set(x, 0.17, z); wall.castShadow = wall.receiveShadow = true; g.add(wall);
+  }
+  scene.add(g);
+}
+function makePlate(pos, radius, topColor) {
+  const g = new THREE.Group(); g.position.copy(pos);
+  const ped = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius * 1.08, 0.6, 28), darkWood);
+  ped.position.y = -0.3; ped.receiveShadow = true; g.add(ped);
+  const top = new THREE.Mesh(new THREE.CircleGeometry(radius * 0.9, 28), new THREE.MeshStandardMaterial({ color: topColor, roughness: 0.9 }));
+  top.rotation.x = -Math.PI / 2; top.position.y = 0.005; top.receiveShadow = true; g.add(top);
+  // Iron rim; gets its own material so a player's rim can light up on their turn
+  const ringMat = new THREE.MeshStandardMaterial({ color: '#4a4640', metalness: 0.85, roughness: 0.45, emissive: '#000000' });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.93, 0.06, 8, 40), ringMat);
+  ring.rotation.x = Math.PI / 2; ring.position.y = 0.03; g.add(ring);
+  scene.add(g);
+  return { group: g, ringMat };
+}
+makeTray(HORN_TRAY, '#4a2416');    // dark red leather: the mead bench
+makeTray(STORM_TRAY, '#1b2836');   // dark sea-blue: wreckage
+makePlate(AT_SEA, 1.4, '#16303a'); // the sea
+
+// ---------- Coins ----------
+const coinGeo = new THREE.CylinderGeometry(0.26, 0.26, 0.06, 24);
+const coinMat = new THREE.MeshStandardMaterial({ color: '#e8b84a', metalness: 0.85, roughness: 0.3, emissive: '#3a2600', emissiveIntensity: 0.5 });
+// Coins stack in columns of 10; columns are laid out center-first in hexagonal rings (1 + 6 + 12 = 19 columns)
+const COLS = [[0, 0]];
+for (let ring = 1; ring <= 2; ring++)
+  for (let k = 0; k < 6 * ring; k++) { const a = k / (6 * ring) * Math.PI * 2; COLS.push([Math.cos(a) * ring * 0.55, Math.sin(a) * ring * 0.55]); }
+const PER_COL = 10;
+
+// A pile of coins at one spot. `inFlight` counts coins flying toward it, so each flight knows which slot it will land in.
+class Pile {
+  constructor(pos) { this.pos = pos.clone(); this.coins = []; this.inFlight = 0; }
+  // Coins spread across the 7 inner columns first (so small amounts are easy to count),
+  // then those stack up to PER_COL high, then the outer ring of 12 columns fills the same way
+  slot(i) {
+    const inner = 7 * PER_COL;
+    let col, level;
+    if (i < inner) { col = i % 7; level = Math.floor(i / 7); }
+    else { const j = i - inner; col = 7 + j % 12; level = Math.floor(j / 12); }   // past 190 coins the outer ring keeps stacking higher
+    return new THREE.Vector3(this.pos.x + COLS[col][0], 0.032 + level * 0.062, this.pos.z + COLS[col][1]);
+  }
+  add() {
+    const m = new THREE.Mesh(coinGeo, coinMat);
+    m.position.copy(this.slot(this.coins.length));
+    m.rotation.y = Math.random() * 6;
+    m.castShadow = true; scene.add(m);
+    this.coins.push(m);
+  }
+  removeTop() { const m = this.coins.pop(); if (m) scene.remove(m); return m; }
+  setCount(n) { this.inFlight = 0; while (this.coins.length < n) this.add(); while (this.coins.length > n) this.removeTop(); }
+  get count() { return this.coins.length; }
+}
+const atSea = new Pile(AT_SEA);
+
+// A coin arcs from `from` into `pile`, spinning, then joins the stack
+function flyCoin(from, pile, delay = 0) {
+  const target = pile.slot(pile.count + pile.inFlight++);
+  return wait(delay).then(() => {
+    const m = new THREE.Mesh(coinGeo, coinMat);
+    m.position.copy(from); scene.add(m);
+    return animate(650, t => {
+      m.position.lerpVectors(from, target, ease(t));
+      m.position.y += Math.sin(t * Math.PI) * 2.2;
+      m.rotation.x = t * 9;
+      if (t >= 1) { scene.remove(m); pile.inFlight = Math.max(0, pile.inFlight - 1); pile.add(); SFX.clink(); }
+    });
+  });
+}
+// Bust: the unclaimed gold tumbles and sinks out of sight
+function sinkPile(pile) {
+  const coins = pile.coins.splice(0);
+  if (!coins.length) return Promise.resolve();
+  const mat = coinMat.clone(); mat.transparent = true;
+  coins.forEach(c => c.material = mat);
+  const y0 = coins.map(c => c.position.y);
+  return animate(1300, t => {
+    coins.forEach((c, i) => { c.position.y = y0[i] - t * (0.6 + (i % 3) * 0.25); c.rotation.z = t * (2 + i % 4); });
+    mat.opacity = 1 - t;
+    if (t >= 1) { coins.forEach(c => scene.remove(c)); mat.dispose(); }
+  });
+}
+
+// ---------- Player banks (claimed gold), rebuilt when the player list changes ----------
+let banks = [], bankKey = '';
+function syncBanks(players, turnIdx, online) {
+  const key = players.map(p => p.id).join();
+  if (key !== bankKey) {
+    for (const b of banks) { b.pile.setCount(0); scene.remove(b.plate.group); b.label.el.remove(); labels.splice(labels.indexOf(b.label), 1); }
+    const n = players.length, spacing = Math.min(2.7, 17 / Math.max(n, 1));
+    banks = players.map((p, i) => {
+      const pos = new THREE.Vector3((i - (n - 1) / 2) * spacing, 0, BANK_ROW_Z);
+      return { plate: makePlate(pos, 1.15, '#2a1a10'), pile: new Pile(pos), label: addLabel(pos.clone().setZ(pos.z + 1.25)) };
+    });
+    bankKey = key;
+  }
+  banks.forEach((b, i) => {
+    const cur = i === turnIdx;
+    b.plate.ringMat.emissive.set(cur ? '#c9963a' : '#000000');
+    b.plate.ringMat.emissiveIntensity = cur ? 1.6 : 0;
+    b.label.el.classList.toggle('cur', cur);
+    b.label.render = () => `${esc(players[i].name)}${online && !online[i] ? ' <small>(away)</small>' : ''}<br><b>${b.pile.count}</b> <small>claimed</small>`;
+  });
+}
+
+// ---------- Trays for horn and storm dice ----------
+const trays = {
+  horn:  { pos: HORN_TRAY,  face: 'horn',  tint: '#c4b49a', dice: [] },   // slightly dimmed: temporarily out
+  storm: { pos: STORM_TRAY, face: 'storm', tint: '#7d8ea8', dice: [] },   // cold blue-grey: lost this turn
+};
+// 2 columns × 4 rows of slots per tray
+const traySlot = (tray, i) => new THREE.Vector3(tray.pos.x + (i % 2 ? 0.6 : -0.6), 0.5, tray.pos.z - 1.65 + Math.floor(i / 2) * 1.1);
+// Rotation that turns the given face to point straight up
+const faceUp = face => new THREE.Quaternion().setFromUnitVectors(FACE_NORMALS[FACES.indexOf(face)], UP);
+
+function disposeDie(d) { scene.remove(d.mesh); d.mats.forEach(m => m.dispose()); if (d.halo) scene.remove(d.halo); }
+function dimDie(d, tint) {
+  d.mats.forEach(m => { m.color.set(tint); m.emissive.set(0x000000); });
+  if (d.halo) { scene.remove(d.halo); d.halo = null; }
+}
+// Lift a die off the table and arc it into the next free tray slot
+function toTray(d, key) {
+  const tray = trays[key], i = tray.dice.length;
+  tray.dice.push(d);
+  tableDice.splice(tableDice.indexOf(d), 1);   // the tray owns it now, so clearing the table won't remove it
+  d.gone = true;
+  if (d.halo) { scene.remove(d.halo); d.halo = null; }
+  const from = d.mesh.position.clone(), to = traySlot(tray, i);
+  const q0 = d.mesh.quaternion.clone(), q1 = faceUp(tray.face);
+  return animate(850, t => {
+    d.mesh.position.lerpVectors(from, to, ease(t));
+    d.mesh.position.y += Math.sin(t * Math.PI) * 2.5;
+    d.mesh.quaternion.slerpQuaternions(q0, q1, ease(t));
+    if (t >= 1) dimDie(d, tray.tint);
+  });
+}
+// Instantly put a die in a tray (used to catch up, e.g. when joining mid-turn)
+function placeInTray(key) {
+  const tray = trays[key], d = makeDie();
+  d.top = FACES.indexOf(tray.face); d.face = tray.face;
+  d.mesh.position.copy(traySlot(tray, tray.dice.length));
+  d.mesh.quaternion.copy(faceUp(tray.face));
+  dimDie(d, tray.tint);
+  tray.dice.push(d);
+}
+function setTrayCount(key, n) {
+  const tray = trays[key];
+  while (tray.dice.length > n) disposeDie(tray.dice.pop());
+  while (tray.dice.length < n) placeInTray(key);
+}
+// Last throw's horn dice have had their rest: they hop out of the tray back onto the table (along the west edge),
+// so every die you're about to throw is on the table, ready to be gathered into your hand
+function returnRestingDice() {
+  const old = trays.horn.dice.splice(0), m = old.length;
+  return Promise.all(old.map((d, i) => wait(i * 90).then(() => {
+    const from = d.mesh.position.clone(), to = new THREE.Vector3(-5.6, 0.5, (i - (m - 1) / 2) * 1.1);
+    d.mats.forEach(mt => mt.color.set('#ffffff'));   // undo the tray's dimming
+    d.gone = false; d.returned = true;                // back in play, but not part of this throw's result
+    tableDice.push(d);
+    return animate(700, t => {
+      d.mesh.position.lerpVectors(from, to, ease(t));
+      d.mesh.position.y += Math.sin(t * Math.PI) * 1.8;
+    });
+  })));
+}
+
+// ---------- Labels that follow 3D positions ----------
+const labels = [];
+function addLabel(pos, render = () => '') {
+  const el = document.createElement('div');
+  el.className = 'spotLabel';
+  document.getElementById('labels').appendChild(el);
+  const L = { el, pos, render, last: '' };
+  labels.push(L);
+  return L;
+}
+function toScreen(pos) {
+  const r = renderer.domElement.getBoundingClientRect(), v = pos.clone().project(camera);
+  return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height };
+}
+function updateLabels() {
+  for (const L of labels) {
+    const html = L.render();
+    if (html !== L.last) { L.el.innerHTML = html; L.last = html; }   // only touch the DOM when the text changes
+    const s = toScreen(L.pos);
+    L.el.style.left = `${s.x}px`; L.el.style.top = `${s.y}px`;
+  }
+}
+addLabel(HORN_TRAY.clone().setZ(HORN_TRAY.z - 3.5), () => `${ico('horn')} Mead bench<br><small>sits out 1 throw</small>`);
+addLabel(STORM_TRAY.clone().setZ(STORM_TRAY.z + 2.6), () => `${ico('storm')} Lost to the storm<br><small>gone this turn</small>`);
+addLabel(AT_SEA.clone().setZ(AT_SEA.z + 1.5), () => `At sea <b>${atSea.count}</b><br><small>unclaimed</small>`);
+
+// Snap every spot to match a game state (called whenever animations have finished)
+function syncSpots(v) {
+  const inGame = v && v.phase !== 'lobby' && v.players?.length;
+  document.getElementById('labels').classList.toggle('hidden', !inGame);
+  if (!inGame) return;
+  const t = v.turn;
+  setTrayCount('horn', t ? t.resting : 0);
+  setTrayCount('storm', t ? t.stormed : 0);
+  atSea.setCount(t ? t.unbanked : 0);
+  syncBanks(v.players, v.phase === 'over' ? -1 : v.turnIdx, v.online);
+  v.players.forEach((p, i) => banks[i].pile.setCount(p.banked));
+}
+
+// =====================================================================
+//  EFFECTS — glows, lightning, shield shine, fades, floating text
+// =====================================================================
+const effects = [];   // each is a function(now) that returns false when finished
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function animate(dur, fn) {   // fn(t) with t going 0→1 over dur ms
+  return new Promise(res => {
+    const t0 = performance.now();
+    effects.push(now => {
+      const t = Math.min((now - t0) / dur, 1);
+      // A broken effect just ends early: it must never stop the render loop or leave the game waiting on it forever
+      try { fn(t); } catch (e) { console.error(e); res(); return false; }
+      if (t >= 1) { res(); return false; }
+      return true;
+    });
+  });
+}
+
+// Light up the die's top face (and a soft halo above it). `level` is where it stays after the initial pulse.
+function glow(d, color, level = 0.6) {
+  const mat = d.mats[d.top];
+  mat.emissive.set(color);
+  if (!d.halo) {
+    d.halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 }));
+    d.halo.scale.set(2.4, 2.4, 1);
+    scene.add(d.halo);
+  }
+  d.halo.material.color.set(color);
+  d.halo.position.copy(d.mesh.position).y += 0.2;
+  return animate(700, t => {
+    const pulse = Math.sin(t * Math.PI);                     // 0 → 1 → 0
+    mat.emissiveIntensity = level + pulse * 1.2;
+    if (d.halo) d.halo.material.opacity = Math.min(1, level * 1.2 + pulse * 0.6);   // halo may be removed mid-pulse (die moved to a tray)
+  });
+}
+
+// Electric bolts crawling over the surface of a die.
+// Bolts are random walks that get pushed back onto the cube's surface each step.
+function boltGeometry() {
+  const pts = [];
+  const onSurface = p => p.multiplyScalar(0.535 / Math.max(Math.abs(p.x), Math.abs(p.y), Math.abs(p.z)));
+  for (let b = 0; b < 5; b++) {
+    let p = onSurface(new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1)));
+    for (let s = 0; s < 7; s++) {
+      const q = onSurface(p.clone().add(new THREE.Vector3(rand(-.3, .3), rand(-.3, .3), rand(-.3, .3))));
+      pts.push(p.x, p.y, p.z, q.x, q.y, q.z); p = q;
+    }
+  }
+  return new LineSegmentsGeometry().setPositions(pts);
+}
+function lightning(d, dur = 1300) {
+  const lines = new LineSegments2(boltGeometry(), boltMat);
+  d.mesh.add(lines);                       // child of the die, so the bolts stay glued to it
+  glow(d, FX_COLOR.storm, 0.5);            // blue halo underneath the bolts
+  const mat = d.mats[d.top];
+  flash.position.copy(d.mesh.position).y += 1.5;
+  let last = 0;
+  return animate(dur, t => {
+    const now = performance.now();
+    if (now - last > 55) {                  // re-draw the bolts ~18 times a second so they crackle
+      last = now;
+      lines.geometry.dispose(); lines.geometry = boltGeometry();
+      lines.visible = Math.random() > 0.15;
+      flash.intensity = Math.random() < 0.3 ? 40 : rand(0, 12);
+      mat.emissiveIntensity = rand(0.2, 1.4);
+      if (d.halo) d.halo.material.opacity = rand(0.3, 1);
+    }
+    if (t >= 1) { d.mesh.remove(lines); lines.geometry.dispose(); flash.intensity = 0; mat.emissiveIntensity = 0.3; if (d.halo) d.halo.material.opacity = 0.4; }
+  });
+}
+
+// A diagonal band of light sweeping across every face (additive overlay mesh, texture offset animated)
+const shineTex = (() => {
+  const [c, g] = canvas(256);
+  g.fillStyle = '#000'; g.fillRect(0, 0, 256, 256);
+  const gr = g.createLinearGradient(0, 256, 256, 0);
+  gr.addColorStop(0.38, 'rgba(0,0,0,1)'); gr.addColorStop(0.5, 'rgba(255,255,255,1)'); gr.addColorStop(0.62, 'rgba(0,0,0,1)');
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+  return new THREE.CanvasTexture(c);   // ClampToEdge: sliding past the edge shows black = nothing
+})();
+function shine(d, color = FX_COLOR.shield, dur = 650) {
+  const map = shineTex.clone(); map.needsUpdate = true;
+  // toneMapped:false + a color boosted past 1.0 lets the band go properly bright on the pale bone
+  const mat = new THREE.MeshBasicMaterial({ map, color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  mat.color.multiplyScalar(1.8);
+  const overlay = new THREE.Mesh(dieGeo, mat);
+  overlay.scale.setScalar(1.015);
+  d.mesh.add(overlay);
+  return animate(dur, t => {
+    map.offset.x = THREE.MathUtils.lerp(-0.7, 0.7, t);
+    if (t >= 1) { d.mesh.remove(overlay); overlay.material.dispose(); map.dispose(); }
+  });
+}
+
+// Fade a die out while it drifts (down for storms, up for horns/homes)
+function vanish(d, dy, dur = 900) {
+  d.gone = true;
+  d.mats.forEach(m => { m.transparent = true; m.needsUpdate = true; });
+  const y0 = d.mesh.position.y, h0 = d.halo?.material.opacity ?? 0;
+  return animate(dur, t => {
+    const e = t * t;
+    d.mats.forEach(m => m.opacity = 1 - e);
+    d.mesh.position.y = y0 + dy * t;
+    if (d.halo) { d.halo.material.opacity = h0 * (1 - e); d.halo.position.y = d.mesh.position.y + 0.2; }
+    if (t >= 1) d.mesh.visible = false;
+  });
+}
+
+function floatText(d, text, color) {
+  const s = toScreen(d.mesh.position.clone().setY(d.mesh.position.y + 0.8));
+  const el = document.createElement('div');
+  el.className = 'float'; el.textContent = text; el.style.color = color;
+  el.style.left = `${s.x}px`; el.style.top = `${s.y}px`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1600);
+}
+
+const diceWith = face => tableDice.filter(d => d.face === face && !d.gone && !d.returned);   // returned horn dice weren't in this throw
+
+// The show after the dice settle: ships, then shields, then storms, then horns
+async function playOutcome(o) {
+  showResult(o);
+  const moves = [returnRestingDice()];   // animations to wait for before the turn can continue
+  const ships = diceWith('ship');
+  for (const d of ships) {
+    glow(d, FX_COLOR.ship); SFX.coin(); floatText(d, '+1 gold', FX_COLOR.ship);
+    moves.push(flyCoin(d.mesh.position.clone().setY(1), atSea));   // each ship's coin flies to the "At sea" pile
+    await wait(170);
+  }
+  if (ships.length) await wait(300);
+
+  const shields = diceWith('shield'), storms = diceWith('storm');
+  if (shields.length) {
+    SFX.shine();
+    shields.forEach((d, i) => setTimeout(() => { glow(d, FX_COLOR.shield, 0.3); shine(d); }, i * 90));
+    await wait(500 + shields.length * 90);
+  }
+
+  if (storms.length) {
+    SFX.thunder();
+    await Promise.all(storms.map(d => lightning(d)));
+    // The first `blocked` storms are saved by shield pairs; the rest are lost
+    for (const [i, d] of storms.entries()) {
+      if (i < o.blocked) {
+        d.blocked = true;   // for the hover tooltip
+        SFX.blocked(); shine(d, '#ffffff', 500); floatText(d, 'Blocked!', FX_COLOR.shield);
+        shields.slice(i * SHIELDS_PER_STORM, (i + 1) * SHIELDS_PER_STORM).forEach(s => shine(s, '#ffffff', 500));
+      } else {
+        floatText(d, 'Lost to the storm', FX_COLOR.storm); moves.push(toTray(d, 'storm'));
+      }
+      await wait(250);
+    }
+    await wait(500);
+  }
+
+  const horns = diceWith('horn');
+  if (horns.length) {
+    SFX.horn();
+    for (const d of horns) { glow(d, FX_COLOR.horn); floatText(d, 'Skips a throw', FX_COLOR.horn); }
+    await wait(700);
+    moves.push(...horns.map((d, i) => wait(i * 90).then(() => toTray(d, 'horn'))));   // off to the mead bench
+    await wait(400);
+  }
+
+  await Promise.all(moves);
+  if (o.bust) {
+    SFX.bust();
+    tableDice.filter(d => !d.gone).forEach(d => glow(d, '#c0302a', 0.25));
+    showBanner('Bust!', o.goldLost ? `${o.goldLost} gold lost at sea` : 'No ships came home', '#d0452e');
+    await Promise.all([sinkPile(atSea), wait(1200)]);
+  } else if (o.out) {
+    outOfDiceBanner(o.out);
+    await Promise.all([sinkPile(atSea), wait(1200)]);
+  } else {
+    diceWith('home').forEach(d => glow(d, FX_COLOR.home, 0.25));   // hint: these can be spent
+  }
+}
+
+function outOfDiceBanner(out) {
+  SFX.bust();
+  showBanner('Out of dice!', out.goldLost ? `${out.goldLost} gold lost at sea` : 'One die can\'t bring gold home', '#d0452e');
+}
+
+async function homeEffect(amount) {
+  const d = tableDice.find(d => d.face === 'home' && !d.gone && !d.spent);
+  const bank = banks[view.turnIdx];
+  SFX.home();
+  showBanner(`+${amount} gold home!`, 'Safe in the longhouse', FX_COLOR.ship);
+  const moves = [];
+  if (d) {
+    d.spent = true;
+    await glow(d, FX_COLOR.home, 0.9);
+    shine(d, FX_COLOR.home, 600);
+    floatText(d, `+${amount} banked`, FX_COLOR.ship);
+    // The home die leads the way to the player's bank, then fades
+    const from = d.mesh.position.clone(), to = bank.pile.pos.clone().setY(1.2);
+    if (d.halo) { scene.remove(d.halo); d.halo = null; }
+    moves.push(animate(900, t => {
+      d.mesh.position.lerpVectors(from, to, ease(t));
+      d.mesh.position.y += Math.sin(t * Math.PI) * 2;
+    }).then(() => vanish(d, 0.5, 500)));
+  }
+  // ...and the unclaimed coins follow it, one after another, from the sea into the bank
+  for (let k = 0; k < amount; k++) {
+    const c = atSea.removeTop();
+    if (!c) break;
+    moves.push(flyCoin(c.position.clone(), bank.pile, 120 + k * 70));
+  }
+  await Promise.all(moves);
+}
+
+// =====================================================================
+//  SOUND — all synthesized with Web Audio (no sound files)
+// =====================================================================
+let ac = null, master = null;
+const noiseCache = {};
+function audio() {
+  // Browsers only allow audio after a click, so this is first called from a click handler
+  if (!ac) { ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.gain.value = 0.8 * volume / 100; master.connect(ac.destination); }
+  if (ac.state === 'suspended') ac.resume();
+  return ac;
+}
+addEventListener('pointerdown', audio);
+function noise(sec, brown) {
+  const key = `${sec}${brown}`;
+  if (noiseCache[key]) return noiseCache[key];
+  const a = audio(), buf = a.createBuffer(1, Math.ceil(a.sampleRate * sec), a.sampleRate), ch = buf.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < ch.length; i++) {
+    const w = Math.random() * 2 - 1;
+    // brown noise = running sum of white noise (deep rumble); white = hiss
+    ch[i] = brown ? (last = (last + 0.02 * w) / 1.02) * 3.5 : w;
+  }
+  return noiseCache[key] = buf;
+}
+function ping(f, delay, dur, vol, type = 'sine') {
+  const a = audio(), t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.05);
+}
+function hiss({ dur, vol, type, freq, q = 1, delay = 0, attack = 0.002, brown = false }) {
+  const a = audio(), t = a.currentTime + delay, src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  src.buffer = noise(dur, brown); f.type = type; f.frequency.value = freq; f.Q.value = q;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f).connect(g).connect(master); src.start(t);
+}
+const SFX = {
+  clack(v) {   // bone on wood: short filtered noise tick + a tiny tone, louder for harder hits
+    if (!ac) return;
+    const vol = Math.min(v / 10, 1) * 0.5;
+    hiss({ dur: 0.045, vol, type: 'bandpass', freq: rand(1600, 3800), q: 4 });
+    ping(rand(900, 1500), 0, 0.04, vol * 0.25, 'triangle');
+  },
+  coin()    { ping(1320, 0, 0.25, 0.18, 'triangle'); ping(1760, 0.07, 0.35, 0.16, 'triangle'); },
+  clink()   { if (ac) ping(rand(2300, 3100), 0, 0.09, 0.05, 'triangle'); },   // a coin landing on a stack
+  whoosh(quiet) {   // dice being swept up into a hand: a rising band of air noise
+    if (!ac) return;
+    const a = audio(), t = a.currentTime, src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    src.buffer = noise(0.9, false); f.type = 'bandpass'; f.Q.value = 1.5;
+    f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(2200, t + 0.7);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(quiet ? 0.12 : 0.25, t + 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    src.connect(f).connect(g).connect(master); src.start(t);
+  },
+  shine()   { [2093, 2637, 3136, 4186].forEach((f, i) => ping(f, i * 0.05, 0.6, 0.06)); },
+  blocked() { hiss({ dur: 0.15, vol: 0.35, type: 'bandpass', freq: 900, q: 2 }); ping(880, 0, 0.6, 0.15, 'triangle'); ping(1320, 0, 0.5, 0.08); },
+  thunder() {  // sharp crack, then a long low rumble
+    hiss({ dur: 0.3, vol: 0.5, type: 'highpass', freq: 1200 });
+    hiss({ dur: 2.6, vol: 0.9, type: 'lowpass', freq: 260, brown: true, delay: 0.05, attack: 0.08 });
+  },
+  horn() {     // two low sawtooth notes through a lowpass, swelling in with a little vibrato
+    const a = audio(), t = a.currentTime, g = a.createGain(), lp = a.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 650;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.18, t + 0.35); g.gain.setValueAtTime(0.18, t + 1.0); g.gain.linearRampToValueAtTime(0, t + 1.6);
+    lp.connect(g).connect(master);
+    const lfo = a.createOscillator(), depth = a.createGain(); lfo.frequency.value = 5; depth.gain.value = 1.5; lfo.connect(depth);
+    for (const f of [98, 147]) {
+      const o = a.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; depth.connect(o.frequency);
+      o.connect(lp); o.start(t); o.stop(t + 1.7);
+    }
+    lfo.start(t); lfo.stop(t + 1.7);
+  },
+  home() { [262, 330, 392, 523].forEach((f, i) => ping(f, i * 0.08, 0.9, 0.12, 'triangle')); setTimeout(() => SFX.coin(), 350); },
+  bust() {
+    const a = audio(), t = a.currentTime, o = a.createOscillator(), g = a.createGain(), lp = a.createBiquadFilter();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(220, t); o.frequency.exponentialRampToValueAtTime(70, t + 0.9);
+    lp.type = 'lowpass'; lp.frequency.value = 500;
+    g.gain.setValueAtTime(0.22, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.0);
+    o.connect(lp).connect(g).connect(master); o.start(t); o.stop(t + 1.05);
+    hiss({ dur: 0.5, vol: 0.4, type: 'lowpass', freq: 150, brown: true });
+  },
+  turn() { if (ac) { ping(196, 0, 0.5, 0.08, 'triangle'); ping(294, 0.12, 0.7, 0.08, 'triangle'); } },
+  emote(k) {
+    if (!ac) return;
+    if (k === 'skal') {        // two mugs clunking together
+      hiss({ dur: 0.12, vol: 0.35, type: 'bandpass', freq: 700, q: 2 }); ping(520, 0, 0.3, 0.12, 'triangle'); ping(780, 0.02, 0.25, 0.08, 'triangle');
+    } else if (k === 'odin') { // a short horn call
+      SFX.horn();
+    } else if (k === 'laugh') {// "ha-ha-ha": three bouncy rising notes
+      [440, 520, 620].forEach((f, i) => ping(f, i * 0.13, 0.12, 0.09, 'square'));
+    } else if (k === 'groan') {// a sagging, falling tone
+      const a = audio(), t = a.currentTime, o = a.createOscillator(), g = a.createGain(), lp = a.createBiquadFilter();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(190, t); o.frequency.exponentialRampToValueAtTime(95, t + 0.7);
+      lp.type = 'lowpass'; lp.frequency.value = 600;
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.14, t + 0.1); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+      o.connect(lp).connect(g).connect(master); o.start(t); o.stop(t + 0.85);
+    }
+  },
+};
+
+// =====================================================================
+//  UI
+// =====================================================================
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function setErr(id, msg) { $(id).textContent = msg; }
+function showBanner(text, sub, color) {
+  const b = $('banner');
+  b.innerHTML = `${text}${sub ? `<small>${sub}</small>` : ''}`;
+  b.style.color = color;
+  b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');   // restart the CSS animation
+}
+function showLobby() { $('startScreen').classList.add('hidden'); $('lobby').classList.remove('hidden'); }
+
+// Can this screen press the buttons for the current player?
+function iControl(v) {
+  const p = v.turn && curPlayer(v);
+  if (!p) return false;
+  return p.owner === myId || (isHost && !v.online[v.turnIdx]);
+}
+
+function showResult(o, homesLeft = o.homes) {
+  $('chips').innerHTML = o.faces.map(f => `<img src="${iconURLs[f]}" alt="${LABELS[f]}" title="${LABELS[f]}">`).join('');
+  const parts = [];
+  if (o.ships) parts.push(`${ico('ship')} +${o.ships} gold`);
+  if (o.blocked) parts.push(`${ico('shield')} blocked ${o.blocked} storm${o.blocked > 1 ? 's' : ''}`);
+  if (o.lost) parts.push(`${ico('storm')} ${o.lost} lost`);
+  if (o.horns) parts.push(`${ico('horn')} ${o.horns} skip${o.horns > 1 ? '' : 's'} next throw`);
+  if (o.bust) parts.push(`<span style="color:var(--red)">Bust!</span>`);
+  else if (homesLeft) parts.push(`${ico('home')} ${homesLeft} home${homesLeft > 1 ? 's' : ''} available`);
+  $('outcome').innerHTML = parts.join(' · ');
+}
+
+function render() {
+  const v = view;
+  if (!v) return;
+  if (v.phase === 'lobby') return renderLobby(v);
+  $('lobby').classList.add('hidden');
+  if (v.phase === 'over') return;
+  $('gameOver').classList.add('hidden');
+  for (const id of ['topbar', 'bottom', 'emotes']) $(id).classList.remove('hidden');
+
+  const p = curPlayer(v), t = v.turn;
+  $('turnLine').innerHTML = `Round ${v.round}/${v.rounds} · <span class="who">${esc(p.name)}</span>'s turn${t.throws ? ` · throw ${t.throws}` : ''}`;
+  $('lastLog').textContent = v.log.at(-1) || '';   // scores now live on the 3D banks; just show the latest event here
+
+  // Status line: dice still in play, what has been lost and how, gold at risk
+  $('status').innerHTML = [
+    `<span>Dice <b>${t.pool}</b>/${START_DICE}</span>`,
+    t.resting ? `<span>${ico('horn')} ${t.resting} sitting out next throw</span>` : '',
+    t.stormed ? `<span>${ico('storm')} ${t.stormed} lost</span>` : '',
+    t.homesSpent ? `<span>${ico('home')} ${t.homesSpent} spent</span>` : '',
+    `<span>At sea: <b class="goldtxt">${t.unbanked}</b> gold</span>`,
+  ].join('');
+
+  // Buttons for whoever controls this player; everyone else sees who we're waiting on
+  const mine = iControl(v);
+  let html = '';
+  if (v.phase === 'animating') html = `<span id="waiting">The dice are rolling…</span>`;
+  else if (v.phase === 'bust' || v.phase === 'out' || v.phase === 'skip') html = `<span id="waiting">Passing the dice…</span>`;
+  else if (!mine) html = `<span id="waiting">Waiting for ${esc(p.name)}…</span>`;
+  else {
+    if (v.phase === 'decide' && t.homesLeft > 0) html += `<button id="homeBtn" ${t.unbanked ? '' : 'disabled'}>${ico('home')} Bring ${t.unbanked} gold home</button>`;
+    const n = throwable(t);
+    if (n > 0) html += `<button class="primary" id="throwBtn">Throw ${n} ${n > 1 ? 'dice' : 'die'}</button>
+      <span class="hint">…or press on the table, shake, and let go to throw${t.homesLeft > 0 && t.unbanked ? ' · click a glowing home die to bank' : ''}</span>`;
+  }
+  $('actions').innerHTML = html;
+  $('throwBtn')?.addEventListener('click', e => { e.currentTarget.disabled = true; act('throw'); });
+  $('homeBtn')?.addEventListener('click', e => { e.currentTarget.disabled = true; act('home'); });
+  if (v.phase === 'ready') { $('chips').innerHTML = ''; $('outcome').innerHTML = ''; }
+  else if (t.last && v.phase !== 'animating') showResult(t.last, t.homesLeft);
+}
+
+function renderLobby(v) {
+  $('lobby').classList.remove('hidden');
+  $('emotes').classList.add('hidden');
+  $('codeBox').classList.toggle('hidden', !v.code);
+  $('codeTxt').textContent = v.code || '';
+  $('hostControls').classList.toggle('hidden', !isHost);
+  $('lobbyWait').classList.toggle('hidden', isHost);
+  $('roundsSel').value = v.rounds;
+  // Each row: name, dice style (swatches you can click for your own players, or any player if you're the host), remove button
+  $('lobbyPlayers').innerHTML = v.players.map((q, i) => {
+    const canEdit = q.owner === myId || isHost;
+    const swatches = (canEdit ? STYLE_KEYS : [q.style]).map(k =>
+      `<img class="sw ${k === q.style ? 'sel' : ''} ${canEdit ? 'pick' : ''}" src="${styleSwatch[k]}" title="${DICE_STYLES[k].name}" data-pid="${q.id}" data-style="${k}">`).join('');
+    const hand = q.hand || 'handful';
+    const handPick = canEdit
+      ? `<select class="hs" data-pid="${q.id}" title="How your dice move while you shake">${HAND_KEYS.map(k => `<option value="${k}" ${k === hand ? 'selected' : ''}>${HAND_STYLES[k].name}</option>`).join('')}</select>`
+      : `<span class="tag">${HAND_STYLES[hand].name}</span>`;
+    return `<div class="prow"><span>${esc(q.name)}${q.owner === myId ? ' <span class="tag">(this screen)</span>' : ''}${v.online[i] ? '' : ' <span class="tag">(left)</span>'}</span>
+      <span class="swatches">${swatches}${handPick}${isHost && i > 0 ? `<button data-rm="${q.id}" style="padding:2px 8px">✕</button>` : ''}</span></div>`;
+  }).join('');
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => act('remove', b.dataset.rm));
+  document.querySelectorAll('.sw.pick').forEach(b => b.onclick = () => act('style', { pid: b.dataset.pid, style: b.dataset.style }));
+  document.querySelectorAll('select.hs').forEach(s => s.onchange = () => act('hand', { pid: s.dataset.pid, hand: s.value }));
+}
+
+function showGameOver() {
+  const v = view;
+  for (const id of ['topbar', 'bottom', 'emotes']) $(id).classList.add('hidden');
+  const ranked = [...v.players].sort((a, b) => b.banked - a.banked);
+  const top = ranked[0].banked, winners = ranked.filter(p => p.banked === top);
+  $('winnerTxt').textContent = winners.length > 1 ? `A tie at ${top} gold!` : `${winners[0].name} wins with ${top} gold!`;
+  $('finalRows').innerHTML = ranked.map(p => `<div class="prow"><span>${esc(p.name)}</span><span class="goldtxt">${p.banked}</span></div>`).join('');
+  $('againBtn').classList.toggle('hidden', !isHost);
+  $('gameOver').classList.remove('hidden');
+  SFX.home();
+}
+
+// Rules text, with the face icons inline
+$('rulesList').innerHTML = [
+  `${ico('ship')} <b>Ship</b> (2 faces): +1 gold each. Roll <b>no ships</b> and you bust: your turn ends and all gold still at sea is lost.`,
+  `${ico('home')} <b>Home</b>: spend it to bring all your gold at sea home (banked for good). That die is used up for this turn.`,
+  `${ico('storm')} <b>Storm</b>: that die is lost for the rest of your turn…`,
+  `${ico('shield')} <b>Shield</b>: …unless you rolled shields: every ${SHIELDS_PER_STORM} shields block one storm.`,
+  `${ico('horn')} <b>Horn</b>: that die goes off for a drink. It sits out your <i>next throw</i>, then rejoins.`,
+  `You can't stop by choice: keep throwing until you bust. A home die is the only way to keep your gold.`,
+  `Down to <b>1 die</b>? Your turn is over and any gold at sea is lost: a lone die can never roll a ship and a home at once.`,
+].map(x => `<li>${x}</li>`).join('');
+
+// Start screen / lobby buttons
+const nameVal = () => $('nameIn').value.trim().slice(0, 16) || 'Viking';
+try { $('nameIn').value = localStorage.getItem('runedice-name') || ''; } catch {}
+const saveName = () => { try { localStorage.setItem('runedice-name', $('nameIn').value.trim()); } catch {} };
+$('hostBtn').onclick = () => { audio(); saveName(); startHost(nameVal()); };
+$('joinBtn').onclick = () => { audio(); saveName(); startJoin(nameVal(), $('codeIn').value.trim().toUpperCase()); };
+$('localBtn').onclick = () => { audio(); saveName(); startLocal(nameVal()); };
+$('addLocalBtn').onclick = () => { act('addLocal', $('localName').value.trim().slice(0, 16)); $('localName').value = ''; };
+$('localName').onkeydown = e => { if (e.key === 'Enter') $('addLocalBtn').click(); };
+$('roundsSel').onchange = e => act('rounds', e.target.value);
+$('startBtn').onclick = () => act('start');
+$('againBtn').onclick = () => act('again');
+$('helpBtn').onclick = () => $('rules').classList.remove('hidden');
+$('rulesClose').onclick = () => $('rules').classList.add('hidden');
+addEventListener('keydown', e => {
+  if (e.code !== 'Space' || e.target.tagName === 'INPUT') return;
+  e.preventDefault();
+  $('throwBtn')?.click();
+});
+
+// =====================================================================
+//  HANDS-ON PLAY — shake & throw with the mouse, click a home die,
+//  hover tooltips, watching others shake, emotes, volume
+// =====================================================================
+const cv = renderer.domElement;
+cv.style.touchAction = 'none';   // so dragging on a phone shakes dice instead of scrolling
+const raycaster = new THREE.Raycaster(), pointerNDC = new THREE.Vector2();
+const HAND_Y = 3.2;                                            // held dice float at this height
+const handPlane = new THREE.Plane(UP.clone(), -HAND_Y);
+function setPointer(e) {
+  const r = cv.getBoundingClientRect();
+  pointerNDC.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(pointerNDC, camera);
+}
+// Where the cursor points at hand height, kept over the table
+function handPoint() {
+  const p = new THREE.Vector3();
+  if (!raycaster.ray.intersectPlane(handPlane, p)) return null;
+  const r = Math.hypot(p.x, p.z);
+  if (r > 5.5) { p.x *= 5.5 / r; p.z *= 5.5 / r; }
+  return p;
+}
+
+// ---------- Hand styles: how held dice move while you shake ----------
+// Each style's offset(i, n, h) says where die i of n sits relative to the hand point right now.
+// h.time = seconds since pickup, h.phase = an angle that runs faster the harder you shake, h.energy = shake strength (0 – 1.6).
+// speed / speedGain set how fast h.phase turns; spin(e) = how fast each die tumbles.
+const TAU = Math.PI * 2;
+const _he = new THREE.Euler(), _hq = new THREE.Quaternion();
+const jitter = j => new THREE.Vector3(rand(-j, j), rand(-j, j), rand(-j, j));
+const HAND_STYLES = {
+  handful: {
+    name: 'Handful', speed: 0, speedGain: 0, spin: e => 0.8 + e * 12,
+    // A loose sunflower-spiral clump that jiggles harder as you shake
+    offset: (i, n, h) => new THREE.Vector3(Math.cos(i * 2.4) * 0.6 * Math.sqrt(i + 0.4), (i % 2) * 0.5 - 0.25, Math.sin(i * 2.4) * 0.6 * Math.sqrt(i + 0.4))
+      .add(jitter(0.06 + h.energy * 0.2)),
+  },
+  ring: {
+    name: 'Rune ring', speed: 1.4, speedGain: 7, spin: e => 1.5 + e * 6,
+    // Dice evenly spaced on a circle, the circle tilted and slowly wobbling; shaking spins it faster
+    offset: (i, n, h) => {
+      const r = Math.max(1.15, n * 0.2), a = i / n * TAU + h.phase;
+      _hq.setFromEuler(_he.set(0.6 + Math.sin(h.time * 0.8) * 0.15, 0, 0.35 + Math.cos(h.time * 0.6) * 0.12));
+      return new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r).applyQuaternion(_hq).add(jitter(h.energy * 0.05));
+    },
+  },
+  implode: {
+    name: 'Implosion', speed: 3, speedGain: 10, spin: e => 3 + e * 16,
+    // Crushed into a tight ball that breathes; shaking makes it throb outward and quake
+    offset: (i, n, h) => {
+      const y = 1 - (i + 0.5) / n * 2, rr = Math.sqrt(1 - y * y), a = i * 2.4;   // spread evenly over a sphere
+      const size = 0.38 + Math.sin(h.time * 4) * 0.06 + h.energy * 0.35 * Math.abs(Math.sin(h.phase * 2));
+      return new THREE.Vector3(Math.cos(a) * rr, y, Math.sin(a) * rr).multiplyScalar(size).add(jitter(0.03 + h.energy * 0.28));
+    },
+  },
+  vortex: {
+    name: 'Vortex', speed: 2.2, speedGain: 9, spin: e => 2 + e * 8,
+    // A spinning cone: narrow at the bottom, wide at the top, like a little whirlwind
+    offset: (i, n, h) => {
+      const f = n > 1 ? i / (n - 1) : 0.5, a = h.phase + i * 1.1, r = 0.3 + f * (1 + h.energy * 0.3);
+      return new THREE.Vector3(Math.cos(a) * r, (f - 0.5) * 2.4 + Math.sin(h.time * 3 + i) * 0.1, Math.sin(a) * r);
+    },
+  },
+  atom: {
+    name: 'Atom', speed: 2.5, speedGain: 9, spin: e => 1 + e * 8,
+    // One die sits in the middle as the nucleus; the rest fly around it on three differently tilted orbits.
+    // All orbits turn at the same speed but start a third of a lap apart, so they never bunch up.
+    offset: (i, n, h) => {
+      if (i === 0 || n < 3) return jitter(0.04 + h.energy * 0.12);
+      const j = i - 1, orbit = j % 3, k = Math.floor(j / 3), per = Math.ceil((n - 1) / 3);
+      const a = h.phase + k / per * TAU + orbit * TAU / 3 / per;
+      _hq.setFromEuler(_he.set(0.5 + orbit * 0.55, orbit * TAU / 3, orbit * 0.4));
+      return new THREE.Vector3(Math.cos(a) * 1.6, 0, Math.sin(a) * 1.6).applyQuaternion(_hq);
+    },
+  },
+  swarm: {
+    name: 'Swarm', speed: 1, speedGain: 5, spin: e => 2 + e * 10,
+    // Each die buzzes on its own looping path, like bees; shaking makes the swarm wilder
+    offset: (i, n, h) => {
+      const p = h.phase, s = 1 + h.energy * 0.4;
+      return new THREE.Vector3(Math.sin(p * (0.9 + i * 0.13) + i) * 1.7 * s, Math.sin(p * (1.3 + i * 0.07) + i * 2) * 0.8, Math.cos(p * (1.1 + i * 0.11) + i * 3) * 1.7 * s);
+    },
+  },
+};
+const HAND_KEYS = Object.keys(HAND_STYLES);
+
+// A "hand": the dice you're holding, floating at a point and moving in the player's hand style.
+// Used for your own shake, and to show other players' shakes live.
+// On creation it gathers the dice: ones lying on the table fly up into it one after another;
+// if the table is empty (first throw of a turn) they rise out of the player's bank instead.
+class Hand {
+  constructor(n, diceStyle, handStyle, at, quiet = false) {
+    this.hs = HAND_STYLES[handStyle] || HAND_STYLES.handful;
+    this.pos = at.clone(); this.target = at.clone();
+    this.energy = 0; this.time = 0; this.phase = 0; this.nextRattle = 0; this.quiet = quiet;
+    this.release = null;   // set when thrown: dice line up where the physics will start them
+    const sources = tableDice.filter(d => !d.gone && !d.spent);
+    const bank = banks[view?.turnIdx]?.pile.pos ?? new THREE.Vector3();
+    const now = performance.now();
+    this.dice = Array.from({ length: n }, (_, i) => {
+      let d = sources[i];
+      if (d) {
+        tableDice.splice(tableDice.indexOf(d), 1);   // the hand owns it now
+        removeHomeHint(d);
+        d.fromTable = true; d.homePos = d.mesh.position.clone(); d.homeQuat = d.mesh.quaternion.clone();
+        d.mats.forEach(m => { m.emissive.set(0x000000); m.color.set('#ffffff'); });
+        if (d.halo) { scene.remove(d.halo); d.halo = null; }
+      } else {
+        d = makeDie(diceStyle);
+        d.mesh.position.copy(bank).setY(0.4).add(new THREE.Vector3(rand(-0.4, 0.4), 0, rand(-0.4, 0.4)));
+        d.mesh.scale.setScalar(0.01); d.grow = true;   // pops into existence as it leaves the bank
+      }
+      d.gather = { from: d.mesh.position.clone(), t0: now + i * 70, dur: 520 };   // staggered: one die after another
+      return d;
+    });
+    this.spinAxes = this.dice.map(() => new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize());
+    SFX.whoosh(quiet);
+  }
+  get gathered() { return this.dice.every(d => !d.gather); }
+  update(dt, now) {
+    this.time += dt;
+    this.pos.lerp(this.target, 1 - Math.exp(-dt * 18));                 // glide toward the cursor
+    this.energy = Math.max(0, this.energy - dt * 1.4);                   // shaking calms down when the mouse stops
+    this.phase += dt * (this.hs.speed + this.energy * this.hs.speedGain);
+    const n = this.dice.length;
+    this.dice.forEach((d, i) => {
+      const goal = this.release ? this.release[i] : this.pos.clone().add(this.hs.offset(i, n, this));
+      const g = d.gather;
+      if (g) {
+        // Gathering: arc from where the die was up into its place in the hand
+        const k = THREE.MathUtils.clamp((now - g.t0) / g.dur, 0, 1);
+        if (k <= 0) return;
+        d.mesh.position.lerpVectors(g.from, goal, ease(k));
+        d.mesh.position.y += Math.sin(k * Math.PI) * 1.2;
+        if (d.grow) d.mesh.scale.setScalar(Math.max(0.01, ease(k)));
+        if (k >= 1) { d.gather = null; d.mesh.scale.setScalar(1); }
+      } else {
+        // Held: follow the style's formation (snappier while lining up for the throw)
+        d.mesh.position.lerp(goal, 1 - Math.exp(-dt * (this.release ? 25 : 16)));
+      }
+      d.mesh.rotateOnAxis(this.spinAxes[i], dt * this.hs.spin(this.energy));
+    });
+    // Rattle: more energy = louder and more frequent clacks (only once the dice are all in hand)
+    if (this.gathered && this.energy > 0.12 && now > this.nextRattle) {
+      SFX.clack((2 + this.energy * 7) * (this.quiet ? 0.5 : 1));
+      this.nextRattle = now + rand(40, 120) / Math.min(1.6, this.energy + 0.3);
+    }
+  }
+  // Thrown: dice snap into the throwing formation that the physics will start from
+  letGo(aimArg) { const aim = aimFromHand(aimArg); this.release = this.dice.map((_, i) => spawnSlot(i, aim)); }
+  // Called off without a throw: table dice drop back where they were, dice from the bank fade away
+  cancel() {
+    for (const d of this.dice) {
+      if (!d.fromTable) { disposeDie(d); continue; }
+      const from = d.mesh.position.clone(), q0 = d.mesh.quaternion.clone();
+      tableDice.push(d);
+      animate(400, t => { d.mesh.position.lerpVectors(from, d.homePos, ease(t)); d.mesh.quaternion.slerpQuaternions(q0, d.homeQuat, ease(t)); });
+    }
+    this.dice = [];
+  }
+  dispose() { this.dice.forEach(disposeDie); this.dice = []; }
+}
+
+let myHand = null, handHistory = [], awaitingThrow = null, lastShakeSent = 0;
+const remoteHands = new Map();   // player id -> Hand, for other people's live shakes
+
+function canThrowNow() {
+  const v = view;
+  return !!(v?.turn && (v.phase === 'ready' || v.phase === 'decide') && iControl(v) && throwable(v.turn) > 0 && !busy && !playback && !awaitingThrow);
+}
+function canSpendHome() {
+  const v = view;
+  return !!(v?.turn && v.phase === 'decide' && iControl(v) && v.turn.homesLeft > 0 && v.turn.unbanked > 0 && !busy && !myHand);
+}
+function clearHands() {
+  myHand?.dispose(); myHand = null;
+  clearTimeout(awaitingThrow); awaitingThrow = null;
+  remoteHands.forEach(h => h.dispose()); remoteHands.clear();
+}
+
+// Tell everyone where my hand is (throttled to ~15 updates a second; always send the "let go" message)
+function sendShake(on) {
+  const now = performance.now();
+  if (on && now - lastShakeSent < 66) return;
+  lastShakeSent = now;
+  const arg = { on, x: myHand?.pos.x ?? 0, z: myHand?.pos.z ?? 0, e: myHand?.energy ?? 0 };
+  if (isHost) relayShake(myId, arg);
+  else if (hostConn?.open) hostConn.send({ t: 'act', a: 'shake', arg });
+}
+// Host: pass a shake on to every other screen (and show it here if it came from a client)
+function relayShake(from, arg) {
+  const p = S?.turn && curPlayer(S);
+  if (!p || !(p.owner === from || (from === myId && !ownerOnline(p.owner)))) return;
+  const msg = { t: 'shake', pid: p.id, n: throwable(S.turn), style: p.style, hs: p.hand, on: !!arg?.on, x: +arg?.x || 0, z: +arg?.z || 0, e: +arg?.e || 0 };
+  for (const [id, c] of conns) if (id !== from && c.open) c.send(msg);
+  if (from !== myId) onShake(msg);
+}
+// Everyone: show (or remove) someone else's shaking hand
+function onShake(m) {
+  if (busy || playback) return;   // a throw is already playing; ignore stragglers
+  let h = remoteHands.get(m.pid);
+  if (!m.on) { h?.cancel(); remoteHands.delete(m.pid); return; }
+  if (!h) { h = new Hand(m.n, m.style, m.hs, new THREE.Vector3(m.x, HAND_Y, m.z), true); remoteHands.set(m.pid, h); }
+  h.target.set(m.x, HAND_Y, m.z);
+  h.energy = Math.max(h.energy, m.e);
+}
+
+// ---------- Pointer: shake, throw, click a home die ----------
+cv.addEventListener('pointerdown', e => {
+  audio(); setPointer(e);
+  const die = pickDie();
+  if (die?.face === 'home' && !die.spent && canSpendHome()) { hideTip(); act('home'); return; }   // click a glowing home die to bank
+  if (!canThrowNow()) return;
+  const p = handPoint();
+  if (!p) return;
+  try { cv.setPointerCapture(e.pointerId); } catch {}   // keep getting moves even if the cursor leaves the canvas
+  hideTip();
+  myHand = new Hand(throwable(view.turn), curStyle(), curPlayer(view).hand, p);
+  handHistory = [{ t: performance.now(), p }];
+  cv.style.cursor = 'grabbing';
+  sendShake(true);
+});
+cv.addEventListener('pointermove', e => {
+  setPointer(e);
+  if (!myHand) return hover(e);
+  const p = handPoint();
+  if (!p) return;
+  const now = performance.now(), last = handHistory.at(-1);
+  myHand.energy = Math.min(1.6, myHand.energy + p.distanceTo(last.p) * 0.35);   // faster movement = more shake
+  myHand.target.copy(p);
+  handHistory.push({ t: now, p });
+  while (handHistory.length > 2 && now - handHistory[0].t > 250) handHistory.shift();
+  sendShake(true);
+});
+cv.addEventListener('pointerup', () => {
+  if (!myHand) return;
+  // Throw velocity = how far the hand moved over roughly the last 0.1 s
+  const now = performance.now(), end = handHistory.at(-1);
+  const start = handHistory.find(h => now - h.t <= 120) || handHistory[0];
+  const dt = Math.max((end.t - start.t) / 1000, 0.016);
+  const vx = (end.p.x - start.p.x) / dt, vz = (end.p.z - start.p.z) / dt;
+  const release = { x: myHand.pos.x, z: myHand.pos.z, vx, vz };
+  myHand.letGo(release);   // dice snap into the throwing formation...
+  cv.style.cursor = '';
+  // Keep the hand visible until the roll arrives (the roll clears it); give up after a few seconds if it never does
+  awaitingThrow = setTimeout(() => { myHand?.cancel(); myHand = null; awaitingThrow = null; sendShake(false); }, 5000);
+  setTimeout(() => act('throw', release), 160);   // ...and get a beat to do it before the throw starts
+});
+cv.addEventListener('pointercancel', () => { if (myHand && !awaitingThrow) { myHand.cancel(); myHand = null; sendShake(false); } });
+cv.addEventListener('pointerleave', hideTip);
+
+// ---------- Clickable home dice: pulsing outline, glowing ring underneath, bobbing arrow ----------
+// Shown only on the screen that can actually click it, and only while clicking would do something.
+let hoveredHome = null;
+const arrowTex = (() => {
+  const [c, g] = canvas(128);
+  g.beginPath(); g.moveTo(24, 30); g.lineTo(104, 30); g.lineTo(64, 104); g.closePath();   // a downward chevron
+  g.fillStyle = '#ffc94a'; g.fill(); g.lineWidth = 8; g.strokeStyle = '#3a2208'; g.lineJoin = 'round'; g.stroke();
+  return new THREE.CanvasTexture(c);
+})();
+function addHomeHint(d) {
+  // Outline trick: a slightly bigger copy of the die, drawn inside-out (back faces only), so just its rim shows around the die
+  const outline = new THREE.Mesh(dieGeo, new THREE.MeshBasicMaterial({ color: '#ffb347', side: THREE.BackSide, transparent: true, depthWrite: false, toneMapped: false }));
+  outline.scale.setScalar(1.14);
+  d.mesh.add(outline);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.0, 48),
+    new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(d.mesh.position.x, 0.02, d.mesh.position.z);
+  const arrow = new THREE.Sprite(new THREE.SpriteMaterial({ map: arrowTex, transparent: true, depthWrite: false, toneMapped: false }));
+  arrow.scale.set(0.55, 0.55, 1);
+  scene.add(ring, arrow);
+  d.hint = { outline, ring, arrow };
+}
+function removeHomeHint(d) {
+  if (!d.hint) return;
+  const { outline, ring, arrow } = d.hint;
+  d.mesh.remove(outline); outline.material.dispose();
+  scene.remove(ring, arrow); ring.geometry.dispose(); ring.material.dispose(); arrow.material.dispose();
+  d.mesh.scale.setScalar(1);
+  d.mats[d.top].emissiveIntensity = 0.25;   // settle back to a faint glow
+  d.hint = null;
+}
+// Runs every frame: adds/removes hints as the situation changes, and animates the ones showing
+function updateHomeHints(t) {
+  const on = canSpendHome();
+  for (const d of tableDice) {
+    const want = on && d.face === 'home' && !d.gone && !d.spent && !d.returned;
+    if (want && !d.hint) addHomeHint(d);
+    else if (!want && d.hint) removeHomeHint(d);
+    if (!d.hint) continue;
+    const p = 0.5 + 0.5 * Math.sin(t * 4), hov = d === hoveredHome;   // p pulses 0 → 1 → 0 about every 1.5 s
+    d.hint.outline.material.opacity = Math.min(1, 0.35 + p * 0.45 + (hov ? 0.35 : 0));
+    d.hint.ring.material.opacity = 0.3 + p * 0.45;
+    d.hint.ring.rotation.z = t * 1.5;
+    d.hint.ring.scale.setScalar(1 + p * 0.15);
+    d.hint.arrow.position.set(d.mesh.position.x, 1.5 + Math.sin(t * 3) * 0.15, d.mesh.position.z);
+    d.mats[d.top].emissive.set(FX_COLOR.home);
+    d.mats[d.top].emissiveIntensity = 0.5 + p * 0.9;
+    d.mesh.scale.setScalar(hov ? 1.1 : 1);   // pops up a little under the cursor
+  }
+}
+
+// ---------- Hover tooltips ----------
+const TIPS = {
+  ship: 'Ship: +1 gold at sea',
+  shield: `Shield: every ${SHIELDS_PER_STORM} shields block one storm`,
+  storm: 'Storm: this die is lost for the turn',
+  home: 'Home: spend it to bring your gold home',
+  horn: 'Horn: sits out your next throw',
+};
+// Which die is under the pointer? (table dice that have landed, plus tray dice)
+function pickDie() {
+  const candidates = [...tableDice.filter(d => !d.gone && d.face), ...trays.horn.dice.map(d => ({ ...d, tray: 'horn' })), ...trays.storm.dice.map(d => ({ ...d, tray: 'storm' }))];
+  const hit = raycaster.intersectObjects(candidates.map(d => d.mesh), false)[0];
+  return hit && candidates.find(d => d.mesh === hit.object);
+}
+function hover(e) {
+  if (playback) return hideTip();
+  const d = pickDie();
+  const clickable = d?.face === 'home' && !d.tray && !d.spent && canSpendHome();
+  hoveredHome = clickable ? d : null;
+  cv.style.cursor = clickable ? 'pointer' : canThrowNow() ? 'grab' : '';
+  if (!d) return hideTip();
+  const text = d.tray === 'horn' ? 'Resting horn: back after your next throw'
+    : d.returned ? 'Back from the mead bench: in play for your next throw'
+    : d.tray === 'storm' ? 'Lost to the storm until your turn ends'
+    : clickable ? `Home: click to bring ${view.turn.unbanked} gold home`
+    : d.blocked ? 'Storm, blocked by your shields'
+    : TIPS[d.face];
+  const tip = $('tip');
+  tip.textContent = text;
+  tip.style.left = `${e.clientX + 14}px`; tip.style.top = `${e.clientY + 14}px`;
+  tip.classList.remove('hidden');
+}
+function hideTip() { $('tip').classList.add('hidden'); hoveredHome = null; }
+
+// ---------- Emotes ----------
+const EMOTES = {
+  skal:  { icon: '🍺', text: 'Skål!' },
+  odin:  { icon: '⚡', text: "Odin's beard!" },
+  laugh: { icon: '😂', text: 'Ha ha ha!' },
+  groan: { icon: '😩', text: 'Argh…' },
+};
+$('emotes').innerHTML = Object.entries(EMOTES).map(([k, v]) => `<button data-emote="${k}" title="${v.text}">${v.icon}</button>`).join('');
+let lastEmote = 0;
+$('emotes').onclick = e => {
+  const k = e.target.closest('[data-emote]')?.dataset.emote;
+  if (!k || performance.now() - lastEmote < 1200) return;   // light rate limit
+  lastEmote = performance.now();
+  act('emote', k);
+};
+const emoteTimes = new Map();   // host: last emote time per sender, to stop spam
+function relayEmote(from, k) {
+  if (!EMOTES[k] || Date.now() - (emoteTimes.get(from) || 0) < 1000) return;
+  emoteTimes.set(from, Date.now());
+  // Speak as the player whose turn it is if you control them, otherwise as your first player
+  const cur = S.turn && curPlayer(S);
+  const p = (cur && cur.owner === from) ? cur : S.players.find(q => q.owner === from);
+  const msg = { t: 'emote', k, pid: p?.id, name: p?.name || 'A guest' };
+  for (const c of conns.values()) if (c.open) c.send(msg);
+  onEmote(msg);
+}
+function onEmote(m) {
+  const em = EMOTES[m.k];
+  if (!em) return;
+  // Pop the bubble up from the speaker's bank, or the top of the table if they have none
+  const i = view?.players?.findIndex(p => p.id === m.pid) ?? -1;
+  const s = toScreen(banks[i] ? banks[i].pile.pos.clone().setY(1.6) : new THREE.Vector3(0, 2, -6));
+  const el = document.createElement('div');
+  el.className = 'bubble';
+  el.innerHTML = `<span class="em">${em.icon}</span> ${esc(em.text)}<small>${esc(m.name)}</small>`;
+  el.style.left = `${s.x}px`; el.style.top = `${s.y}px`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+  SFX.emote(m.k);
+}
+
+// ---------- Volume ----------
+let volume = 70, lastVolume = 70;
+try { const v = localStorage.getItem('runedice-vol'); if (v !== null) volume = +v; } catch {}
+function applyVolume() {
+  if (master) master.gain.value = 0.8 * volume / 100;
+  $('volBtn').textContent = volume === 0 ? '🔇' : volume < 40 ? '🔉' : '🔊';
+  $('volRange').value = volume;
+  $('muteBtn').textContent = volume === 0 ? 'Unmute' : 'Mute';
+  try { localStorage.setItem('runedice-vol', volume); } catch {}
+}
+$('volBtn').onclick = () => $('volPop').classList.toggle('hidden');
+$('volRange').oninput = e => { volume = +e.target.value; if (volume) lastVolume = volume; audio(); applyVolume(); };
+$('muteBtn').onclick = () => { volume = volume ? 0 : (lastVolume || 70); audio(); applyVolume(); };
+applyVolume();
+
+// Debug hook for testing in the console (read-only peek at state)
+window.runeDice = { get view() { return view; }, get host() { return S; }, get dice() { return tableDice; }, get trays() { return trays; }, get atSea() { return atSea; }, get banks() { return banks; }, get hand() { return myHand; }, get remoteHands() { return remoteHands; }, handStyles: HAND_STYLES, fx: { lightning, shine, glow, vanish } };
+
+// =====================================================================
+//  MAIN LOOP
+// =====================================================================
+// Camera follow: while dice tumble, lean a little toward them and push in slightly; ease back when they settle
+const camFocus = new THREE.Vector3(), camGoal = new THREE.Vector3();
+let camZoom = 0;
+function updateCamera(dt) {
+  let zoomGoal = 0;
+  camGoal.set(0, 0, 0);
+  if (playback && tableDice.length) {
+    for (const d of tableDice) camGoal.add(d.mesh.position);
+    camGoal.divideScalar(tableDice.length).setY(0).multiplyScalar(0.3);   // 30% of the way toward the dice
+    zoomGoal = 0.14;
+  }
+  const k = 1 - Math.exp(-dt * 2.5);   // smooth, frame-rate independent easing
+  camFocus.lerp(camGoal, k);
+  camZoom += (zoomGoal - camZoom) * k;
+  const target = camBase.target.clone().add(camFocus);
+  camera.position.copy(camBase.pos).sub(camBase.target).multiplyScalar(1 - camZoom).add(target);
+  camera.lookAt(target);
+}
+
+const clock = new THREE.Clock();
+let lastFrame = performance.now();
+function frame() {
+  const now = performance.now();
+  const dt = Math.min((now - lastFrame) / 1000, 0.05); lastFrame = now;
+  const t = clock.getElapsedTime();
+  torch.intensity = 55 + Math.sin(t * 7.3) * 6 + Math.sin(t * 13.1) * 4 + Math.random() * 5; // layered sines + noise = flicker
+  if (playback) updatePlayback(now);
+  myHand?.update(dt, now);
+  remoteHands.forEach(h => h.update(dt, now));
+  updateCamera(dt);
+  try { updateHomeHints(t); } catch (e) { console.error(e); }
+  for (let i = effects.length - 1; i >= 0; i--) if (effects[i](now) === false) effects.splice(i, 1);
+  renderer.render(scene, camera);
+  try { updateLabels(); } catch (e) { console.error(e); }
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

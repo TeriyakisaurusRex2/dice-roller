@@ -1,0 +1,8 @@
+{
+  "name": "Rune Dice",
+  "description": "Viking push-your-luck 3D dice game with online multiplayer.",
+  "type": "play",
+  "category": "game",
+  "created": "2026-10-21",
+  "tags": ["3D", "multiplayer", "dice"]
+}
